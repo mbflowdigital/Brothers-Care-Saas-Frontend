@@ -4,6 +4,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Activity, ArrowDownLeft, ArrowRight, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, FileText, Filter, Home, Mail, Plus, Search, Stethoscope, Users, Wallet, X } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { evolutions, formatCurrency, monthlyMrr, patients, professionals, revenueByPlan, tenants } from './data'
+import { TenantProvisioningPage } from './features/identity/TenantProvisioningPage'
+import { TenantListPage } from './features/identity/TenantListPage'
 
 const money = (value: number) => formatCurrency(value).replace(',00', '')
 
@@ -97,8 +99,10 @@ function DataTable({ title, subtitle, headers, rows, action }: { title: string; 
 function Pager() { return <div className="pagination"><button aria-label="Página anterior"><ChevronLeft size={13} /></button><button className="active">1</button><button>2</button><button>3</button><button aria-label="Próxima página"><ChevronRight size={13} /></button></div> }
 
 export function AdminContent({ path, query, setQuery, notify }: { path: string; query: string; setQuery: (value: string) => void; notify: Notify }) {
+  void query
+  void setQuery
   if (path === '/admin') return <AdminDashboard notify={notify} />
-  if (path === '/admin/empresas') return <TenantsPage query={query} setQuery={setQuery} />
+  if (path === '/admin/empresas') return <><TenantProvisioningPage /><div style={{ height: 15 }} /><TenantListPage /></>
   if (path === '/admin/assinaturas') return <DataTable title="Assinaturas" subtitle="Renovações e receita recorrente" headers={['Empresa', 'Plano', 'Valor mensal', 'Próxima cobrança', 'Status']} rows={tenants.slice(0, 8).map((tenant) => [tenant.name, tenant.plan, money(tenant.mrr), '01 nov, 2026', 'Ativa'])} action="Nova assinatura" />
   if (path === '/admin/planos') return <DataTable title="Planos Brothers Care" subtitle="Oferta comercial para empresas" headers={['Plano', 'Empresas', 'Profissionais', 'MRR', 'Status']} rows={['Starter', 'Professional', 'Enterprise'].map((name, index) => [name, String([8, 15, 3][index]), String([76, 184, 58][index]), money([2392, 11985, 7563][index]), 'Disponível'])} action="Novo plano" />
   if (path === '/admin/tickets') return <DataTable title="Tickets de suporte" subtitle="Atendimento às empresas clientes" headers={['Ticket', 'Empresa', 'Assunto', 'Responsável', 'Status']} rows={ [['#BC-284', 'Instituto Vitta', 'Ajuste na agenda domiciliar', 'Paulo Mendes', 'Em andamento'], ['#BC-283', 'Clínica Horizonte', 'Dúvida sobre fechamento', 'Carla Souza', 'Aguardando'], ['#BC-282', 'Espaço Reabilitar', 'Convite de profissional', 'Paulo Mendes', 'Concluído'], ['#BC-281', 'Nexus Terapias', 'Relatório por convênio', 'Carla Souza', 'Concluído']] } action="Novo ticket" />

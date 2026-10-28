@@ -5,8 +5,11 @@ import { Activity, AlertCircle, ArrowDownLeft, ArrowRight, Bell, CalendarDays, C
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { appointments, evolutions, monthlyAppointments, patients, professionals, type Profile } from './data'
 import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PartnerForm, PlansPage, ProfessionalForm, ReportsPage, SettingsPage, UsersPage } from './ExtraViews'
+import { AccountActionPage } from './features/identity/AccountActionPage'
+import { LoginPage, toUiSession, type AuthenticatedUiSession } from './features/identity/LoginPage'
+import { getCurrentSession, logout } from './features/identity/accountActionApi'
 
-type Session = { username: string; profile: Profile; name: string }
+type Session = AuthenticatedUiSession
 type ModalRequest = { title: string; content: string; kind?: 'partner' | 'professional' }
 type OpenModal = (modal: ModalRequest | null) => void
 const clinicPath = '/app/dashboard'
@@ -27,15 +30,25 @@ const adminNav = [
 ]
 
 export default function App() {
-  const [session, setSession] = useState<Session | null>(() => {
-    try { return JSON.parse(localStorage.getItem('brothers-care-session') || 'null') as Session | null } catch { return null }
-  })
+  const [session, setSession] = useState<Session | null>(null)
+  const [sessionLoading, setSessionLoading] = useState(true)
   const [toast, setToast] = useState('')
   const [modal, setModal] = useState<ModalRequest | null>(null)
   const [commandOpen, setCommandOpen] = useState(false)
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2800) }
-  const signIn = (value: Session) => { localStorage.setItem('brothers-care-session', JSON.stringify(value)); setSession(value) }
-  const signOut = () => { localStorage.removeItem('brothers-care-session'); setSession(null) }
+  const signIn = (value: Session) => setSession(value)
+  const signOut = async () => {
+    try { await logout() } finally { setSession(null) }
+  }
+
+  useEffect(() => {
+    let mounted = true
+    getCurrentSession()
+      .then((value) => { if (mounted) setSession(value ? toUiSession(value) : null) })
+      .catch(() => { if (mounted) setSession(null) })
+      .finally(() => { if (mounted) setSessionLoading(false) })
+    return () => { mounted = false }
+  }, [])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -46,10 +59,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  if (sessionLoading) return <main className="account-action-page"><div className="account-action-card" role="status">Carregando sessão…</div></main>
+
   return <>
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/login" element={session ? <Navigate to={session.profile === 'admin' ? '/admin' : session.profile === 'professional' ? '/app/minha-agenda' : clinicPath} replace /> : <Login onLogin={signIn} />} />
+      <Route path="/login" element={session ? <Navigate to={session.profile === 'admin' ? '/admin' : session.profile === 'professional' ? '/app/minha-agenda' : clinicPath} replace /> : <LoginPage onLogin={signIn} />} />
+      <Route path="/ativar-conta" element={<AccountActionPage mode="activation" />} />
+      <Route path="/recuperar-senha" element={<AccountActionPage mode="recovery" />} />
       <Route path="/vitta" element={<VittaPage onAction={() => notify('Nossa equipe entrará em contato em breve.')} />} />
       <Route path="/admin/*" element={session?.profile === 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/login" replace />} />
       <Route path="/app/*" element={session && session.profile !== 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/login" replace />} />
@@ -112,6 +129,8 @@ function Login({ onLogin }: { onLogin: (session: Session) => void }) {
   }
   return <main className="login-page"><section className="login-brand-panel"><Brand inverse /><div className="login-brand-copy"><div className="eyebrow" style={{color:'#63d9be'}}>Cuidado conectado</div><h1>Gestão mais clara.<br/><em>Cuidado mais presente.</em></h1><p>Uma plataforma feita para aproximar profissionais, pacientes e a operação da sua clínica.</p></div><div className="login-brand-foot">© 2026 Brothers Digital · Brothers Care</div></section><section className="login-panel"><div className="login-box"><Brand /><h2>Bem-vindo de volta</h2><p>Acesse seu espaço de trabalho Brothers Care.</p><form className="login-form" onSubmit={submit}><div className="field"><label htmlFor="username">Usuário</label><input id="username" autoComplete="username" placeholder="Seu usuário" value={username} onChange={(event)=>setUsername(event.target.value)} required /></div><div className="field"><label htmlFor="password">Senha</label><input id="password" type="password" autoComplete="current-password" placeholder="Sua senha" value={password} onChange={(event)=>setPassword(event.target.value)} required /></div>{error&&<div className="login-error">{error}</div>}<button className="button button-dark" type="submit">Entrar na plataforma <ArrowRight /></button></form><div className="demo-box"><strong>Acessos para demonstração</strong><div className="demo-row"><span>Super Admin Brothers</span><code>admin / admin</code></div><div className="demo-row"><span>Admin Instituto Vitta</span><code>adminVitta / adminVitta</code></div><div className="demo-row"><span>Profissional Ana Souza</span><code>userVitta / userVitta</code></div></div><p style={{marginTop:18,fontSize:9}}>Ao entrar, você concorda com nossos termos e política de privacidade.</p></div></section></main>
 }
+
+void Login
 
 function VittaPage({ onAction }: { onAction: () => void }) {
   const services = [[HeartPulse,'Terapia Ocupacional','Autonomia e participação nas atividades do dia a dia.'],[Activity,'Fisioterapia','Movimento, funcionalidade e qualidade de vida.'],[MessageCircle,'Fonoaudiologia','Comunicação, linguagem e deglutição.'],[Sparkles,'Psicologia','Acolhimento e cuidado em cada etapa.'],[Home,'Atendimento domiciliar','Cuidado próximo, no conforto de casa.']] as const

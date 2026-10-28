@@ -69,7 +69,7 @@ export async function createTenant(tenantName: string, administratorEmail: strin
   throw new Error(problem?.title ?? 'Não foi possível criar a empresa.')
 }
 
-export type TenantListItem = { id: string; name: string; status: string }
+export type TenantListItem = { id: string; name: string; status: string; firstAdministratorStatus: string }
 export async function listTenants(search = ''): Promise<TenantListItem[]> {
   const response = await fetch(`${apiBaseUrl}/tenants?search=${encodeURIComponent(search)}`, { credentials: 'include' })
   if (!response.ok) throw new Error('Não foi possível carregar as empresas.')

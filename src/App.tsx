@@ -9,6 +9,7 @@ import { AccountActionPage } from './features/identity/AccountActionPage'
 import { LoginPage, toUiSession, type AuthenticatedUiSession } from './features/identity/LoginPage'
 import { getCurrentSession, logout } from './features/identity/accountActionApi'
 import { CommercialOnboardingSection } from './features/commercial/CommercialOnboardingSection'
+import { ClinicOnboardingPage } from './features/onboarding/pages/ClinicOnboardingPage'
 
 type Session = AuthenticatedUiSession
 type ModalRequest = { title: string; content: string; kind?: 'partner' | 'professional' }
@@ -68,6 +69,7 @@ export default function App() {
       <Route path="/login" element={session ? <Navigate to={session.profile === 'admin' ? '/admin' : session.profile === 'professional' ? '/app/minha-agenda' : clinicPath} replace /> : <LoginPage onLogin={signIn} />} />
       <Route path="/ativar-conta" element={<AccountActionPage mode="activation" />} />
       <Route path="/recuperar-senha" element={<AccountActionPage mode="recovery" />} />
+      <Route path="/onboarding" element={<ClinicOnboardingPage />} />
       <Route path="/vitta" element={<VittaPage onAction={() => notify('Nossa equipe entrará em contato em breve.')} />} />
       <Route path="/admin/*" element={session?.profile === 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/login" replace />} />
       <Route path="/app/*" element={session && session.profile !== 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/login" replace />} />

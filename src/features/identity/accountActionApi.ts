@@ -43,8 +43,8 @@ async function postForSession(path: string, payload: object): Promise<AuthSessio
   throw new Error(problem?.title ?? 'Não foi possível entrar. Tente novamente.')
 }
 
-export function login(email: string, password: string) {
-  return postForSession('/auth/login', { email, password })
+export function login(cpf: string, password: string) {
+  return postForSession('/auth/login', { cpf, password })
 }
 
 export async function getCurrentSession(): Promise<AuthSessionSummary | null> {
@@ -76,8 +76,8 @@ export async function listTenants(search = ''): Promise<TenantListItem[]> {
   return response.json() as Promise<TenantListItem[]>
 }
 
-export function activateAccount(token: string, password: string, passwordConfirmation: string) {
-  return post('/auth/activation', { token, password, passwordConfirmation })
+export function activateAccount(token: string, cpf: string, password: string, passwordConfirmation: string) {
+  return post('/auth/activation', { token, cpf, password, passwordConfirmation })
 }
 
 export function requestPasswordRecovery(email: string) {

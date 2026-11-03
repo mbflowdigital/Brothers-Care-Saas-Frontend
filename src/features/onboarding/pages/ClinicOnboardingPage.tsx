@@ -62,6 +62,7 @@ export function ClinicOnboardingPage() {
   const validateCurrent = () => {
     const nextErrors = step === 0 ? validateAdministrator(administrator) : step === 1 ? validateCompany(company) : validateClinicUnit(clinicUnit)
     setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) window.requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus())
     return Object.keys(nextErrors).length === 0
   }
 
@@ -81,6 +82,15 @@ export function ClinicOnboardingPage() {
 
   const submit = async () => {
     setSubmitError('')
+    const validations = [validateAdministrator(administrator), validateCompany(company), validateClinicUnit(clinicUnit)]
+    const invalidStep = validations.findIndex((validation) => Object.keys(validation).length > 0)
+    if (invalidStep >= 0) {
+      setReviewing(false)
+      setStep(invalidStep)
+      setErrors(validations[invalidStep])
+      window.requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus())
+      return
+    }
     setSubmitting(true)
     const data: OnboardingFormData = { administrator, company, clinicUnit }
     try {
@@ -108,7 +118,7 @@ export function ClinicOnboardingPage() {
         {!reviewing && step === 0 && <AdministratorStep value={administrator} email={context.email} errors={errors as FieldErrors<AdministratorData>} onChange={setAdministrator} />}
         {!reviewing && step === 1 && <CompanyStep value={company} cnpj={context.cnpj} errors={errors as FieldErrors<CompanyData>} onChange={setCompany} />}
         {!reviewing && step === 2 && <ClinicUnitStep value={clinicUnit} errors={errors as FieldErrors<ClinicUnitData>} onChange={setClinicUnit} />}
-        {reviewing && <Review context={context} data={{ administrator, company, clinicUnit }} />}
+        {reviewing && <Review context={context} data={{ administrator, company, clinicUnit }} onEdit={(nextStep) => { setReviewing(false); setStep(nextStep); setErrors({}) }} />}
         {submitError && <div className="login-error" role="alert">{submitError}</div>}
       </div>
       <footer className="onboarding-card-foot"><button className="button button-outline" onClick={back} disabled={!reviewing && step === 0 || submitting}><ArrowLeft />Voltar</button>{reviewing ? <button className="button button-primary" onClick={() => void submit()} disabled={submitting}>{submitting ? <><LoaderCircle className="spin" />Concluindo…</> : <>Concluir cadastro <ShieldCheck /></>}</button> : <button className="button button-dark" onClick={next}>Avançar <ArrowRight /></button>}</footer>
@@ -116,13 +126,13 @@ export function ClinicOnboardingPage() {
   </OnboardingFrame>
 }
 
-function Review({ context, data }: { context: OnboardingContext; data: OnboardingFormData }) {
+function Review({ context, data, onEdit }: { context: OnboardingContext; data: OnboardingFormData; onEdit: (step: number) => void }) {
   const groups = [
     { title: 'Administrador', icon: UserRound, rows: [['Nome', data.administrator.displayName], ['E-mail', context.email], ['CPF', data.administrator.cpf]] },
     { title: 'Empresa', icon: Building2, rows: [['CNPJ', maskCnpj(context.cnpj)], ['Razão social', data.company.legalName], ['Nome fantasia', data.company.tradeName], ['Contato', `${data.company.commercialEmail} · ${data.company.phone}`]] },
     { title: 'Unidade padrão', icon: MapPin, rows: [['Unidade', data.clinicUnit.name], ['Endereço', `${data.clinicUnit.street}, ${data.clinicUnit.number}${data.clinicUnit.complement ? ` · ${data.clinicUnit.complement}` : ''}`], ['Localidade', `${data.clinicUnit.district} · ${data.clinicUnit.city}/${data.clinicUnit.state} · ${data.clinicUnit.postalCode}`]] },
   ] as const
-  return <div className="onboarding-review">{groups.map(({ title, icon: Icon, rows }) => <section key={title} className="review-group"><header><span><Icon /></span><h2>{title}</h2></header>{rows.map(([label, value]) => <div className="review-row" key={label}><small>{label}</small><strong>{value}</strong></div>)}</section>)}</div>
+  return <div className="onboarding-review">{groups.map(({ title, icon: Icon, rows }, index) => <section key={title} className="review-group"><header><span><Icon /></span><h2>{title}</h2><button type="button" onClick={() => onEdit(index)}>Editar</button></header>{rows.map(([label, value]) => <div className="review-row" key={label}><small>{label}</small><strong>{value}</strong></div>)}</section>)}</div>
 }
 
 function OnboardingFrame({ children }: { children: React.ReactNode }) {

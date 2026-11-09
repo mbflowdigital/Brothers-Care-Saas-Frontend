@@ -7,11 +7,13 @@ import { appointments, evolutions, monthlyAppointments, patients, professionals,
 import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PartnerForm, PlansPage, ProfessionalForm, ReportsPage, SettingsPage, UsersPage } from './ExtraViews'
 import { AccountActionPage } from './features/identity/AccountActionPage'
 import { LoginPage, toUiSession, type AuthenticatedUiSession } from './features/identity/LoginPage'
+import { TenantSelectionPage } from './features/identity/TenantSelectionPage'
 import { getCurrentSession, logout } from './features/identity/accountActionApi'
 import { CommercialOnboardingSection, type CommercialPlan } from './features/commercial/CommercialOnboardingSection'
 import { ClinicOnboardingPage } from './features/onboarding/pages/ClinicOnboardingPage'
 
 type Session = AuthenticatedUiSession
+const sessionDestination = (session: Session) => session.profile === 'admin' ? '/admin' : !session.tenantId ? '/selecionar-empresa' : session.profile === 'professional' ? '/app/minha-agenda' : '/app/dashboard'
 type ModalRequest = { title: string; content: string; kind?: 'partner' | 'professional' }
 type OpenModal = (modal: ModalRequest | null) => void
 const clinicPath = '/app/dashboard'
@@ -66,13 +68,14 @@ export default function App() {
   return <>
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/login" element={session ? <Navigate to={session.profile === 'admin' ? '/admin' : session.profile === 'professional' ? '/app/minha-agenda' : clinicPath} replace /> : <LoginPage onLogin={signIn} />} />
+      <Route path="/login" element={session ? <Navigate to={sessionDestination(session)} replace /> : <LoginPage onLogin={signIn} />} />
+      <Route path="/selecionar-empresa" element={session && session.profile !== 'admin' ? session.tenantId ? <Navigate to={sessionDestination(session)} replace /> : <TenantSelectionPage session={session} onSelect={signIn} /> : <Navigate to="/login" replace />} />
       <Route path="/ativar-conta" element={<AccountActionPage mode="activation" />} />
       <Route path="/recuperar-senha" element={<AccountActionPage mode="recovery" />} />
       <Route path="/onboarding" element={<ClinicOnboardingPage />} />
       <Route path="/vitta" element={<VittaPage onAction={() => notify('Nossa equipe entrará em contato em breve.')} />} />
       <Route path="/admin/*" element={session?.profile === 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/login" replace />} />
-      <Route path="/app/*" element={session && session.profile !== 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/login" replace />} />
+      <Route path="/app/*" element={session && session.profile !== 'admin' ? session.tenantId ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/selecionar-empresa" replace /> : <Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     {commandOpen && <CommandPalette onClose={() => setCommandOpen(false)} />}
@@ -142,7 +145,7 @@ function Login({ onLogin }: { onLogin: (session: Session) => void }) {
     }
     const user = users[username]
     if (!user || user.password !== password) { setError('Usuário ou senha não conferem. Revise suas credenciais e tente novamente.'); return }
-    onLogin({ username, profile: user.profile, name: user.name })
+    onLogin({ username, profile: user.profile, name: user.name, memberships: [], tenantId: user.profile === 'admin' ? undefined : 'demo-vitta', tenantName: user.profile === 'admin' ? undefined : 'Instituto Vitta' })
     navigate(user.profile === 'admin' ? '/admin' : user.profile === 'professional' ? '/app/minha-agenda' : clinicPath)
   }
   return <main className="login-page"><section className="login-brand-panel"><Brand inverse /><div className="login-brand-copy"><div className="eyebrow" style={{color:'#63d9be'}}>Cuidado conectado</div><h1>Gestão mais clara.<br/><em>Cuidado mais presente.</em></h1><p>Uma plataforma feita para aproximar profissionais, pacientes e a operação da sua clínica.</p></div><div className="login-brand-foot">© 2026 Brothers Digital · Brothers Care</div></section><section className="login-panel"><div className="login-box"><Brand /><h2>Bem-vindo de volta</h2><p>Acesse seu espaço de trabalho Brothers Care.</p><form className="login-form" onSubmit={submit}><div className="field"><label htmlFor="username">Usuário</label><input id="username" autoComplete="username" placeholder="Seu usuário" value={username} onChange={(event)=>setUsername(event.target.value)} required /></div><div className="field"><label htmlFor="password">Senha</label><input id="password" type="password" autoComplete="current-password" placeholder="Sua senha" value={password} onChange={(event)=>setPassword(event.target.value)} required /></div>{error&&<div className="login-error">{error}</div>}<button className="button button-dark" type="submit">Entrar na plataforma <ArrowRight /></button></form><div className="demo-box"><strong>Acessos para demonstração</strong><div className="demo-row"><span>Super Admin Brothers</span><code>admin / admin</code></div><div className="demo-row"><span>Admin Instituto Vitta</span><code>adminVitta / adminVitta</code></div><div className="demo-row"><span>Profissional Ana Souza</span><code>userVitta / userVitta</code></div></div><p style={{marginTop:18,fontSize:9}}>Ao entrar, você concorda com nossos termos e política de privacidade.</p></div></section></main>

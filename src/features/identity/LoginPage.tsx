@@ -5,14 +5,20 @@ import type { Profile } from '../../data'
 import { login, type AuthSessionSummary } from './accountActionApi'
 import { maskCpf } from '../onboarding/validation'
 
-export type AuthenticatedUiSession = { username: string; profile: Profile; name: string; tenantId?: string; tenantName?: string }
+export type AuthenticatedUiSession = {
+  username: string
+  profile: Profile
+  name: string
+  tenantId?: string
+  tenantName?: string
+  memberships: AuthSessionSummary['memberships']
+}
 
 export function toUiSession(session: AuthSessionSummary): AuthenticatedUiSession {
   const profile: Profile = session.platformAdministrator?.role === 'SuperAdministrator'
     ? 'admin'
     : session.memberships.some((membership) => membership.role === 'Professional') ? 'professional' : 'clinic'
-  const membership = session.memberships[0]
-  return { username: session.user.email, profile, name: session.user.displayName, tenantId: session.activeTenant?.id ?? membership?.tenantId, tenantName: session.activeTenant?.name ?? membership?.tenantName }
+  return { username: session.user.email, profile, name: session.user.displayName, tenantId: session.activeTenant?.id, tenantName: session.activeTenant?.name, memberships: session.memberships }
 }
 
 export function LoginPage({ onLogin }: { onLogin: (session: AuthenticatedUiSession) => void }) {
@@ -27,7 +33,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: AuthenticatedUiSessi
     event.preventDefault(); setError(''); setLoading(true)
     try {
       const session = toUiSession(await login(cpf, password)); onLogin(session)
-      navigate(session.profile === 'admin' ? '/admin' : session.profile === 'professional' ? '/app/minha-agenda' : '/app/dashboard')
+      navigate(session.profile === 'admin' ? '/admin' : session.tenantId ? session.profile === 'professional' ? '/app/minha-agenda' : '/app/dashboard' : '/selecionar-empresa')
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível entrar. Tente novamente.') }
     finally { setLoading(false) }
   }

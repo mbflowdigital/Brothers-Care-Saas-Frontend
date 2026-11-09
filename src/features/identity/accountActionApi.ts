@@ -47,6 +47,20 @@ export function login(cpf: string, password: string) {
   return postForSession('/auth/login', { cpf, password })
 }
 
+export function selectActiveTenant(tenantId: string) {
+  return putForSession('/auth/active-tenant', { tenantId })
+}
+
+async function putForSession(path: string, payload: object): Promise<AuthSessionSummary> {
+  const csrfToken = await getCsrfToken()
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify(payload),
+  })
+  if (response.ok) return response.json() as Promise<AuthSessionSummary>
+  const problem = await response.json().catch(() => null) as ProblemDetails | null
+  throw new Error(problem?.title ?? 'Não foi possível selecionar a empresa.')
+}
+
 export async function getCurrentSession(): Promise<AuthSessionSummary | null> {
   const response = await fetch(`${apiBaseUrl}/auth/session`, { credentials: 'include' })
   if (response.status === 401) return null

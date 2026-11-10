@@ -4,12 +4,13 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-r
 import { Activity, AlertCircle, ArrowDownLeft, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, Clock3, Command, CreditCard, FileClock, FileText, Filter, HeartPulse, Home, LayoutDashboard, LogOut, Mail, Menu, MessageCircle, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Shield, Sparkles, Stethoscope, UserCog, UserRound, Users, Wallet, X } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { appointments, evolutions, monthlyAppointments, patients, professionals, type Profile } from './data'
-import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PartnerForm, PlansPage, ProfessionalForm, ReportsPage, SettingsPage, UsersPage } from './ExtraViews'
+import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PartnerForm, PlansPage, ProfessionalForm, ReportsPage, SettingsPage } from './ExtraViews'
 import { AccountActionPage } from './features/identity/AccountActionPage'
 import { LoginPage, toUiSession, type AuthenticatedUiSession } from './features/identity/LoginPage'
 import { TenantSelectionPage } from './features/identity/TenantSelectionPage'
 import { getCurrentSession, logout } from './features/identity/accountActionApi'
 import { ClinicOnboardingPage } from './features/onboarding/pages/ClinicOnboardingPage'
+import { TeamPage, WelcomeTeamCard } from './features/team/TeamPage'
 
 type Session = AuthenticatedUiSession
 const sessionDestination = (session: Session) => session.profile === 'admin' ? '/admin' : !session.tenantId ? '/selecionar-empresa' : session.profile === 'professional' ? '/app/minha-agenda' : '/app/dashboard'
@@ -203,7 +204,7 @@ function PageSkeleton() { return <div className="skeleton-grid" aria-label="Carr
 function Kpi({ label, value, note, icon: Icon, tone = 'teal' }: { label: string; value: string; note?: ReactNode; icon: typeof Users; tone?: string }) { return <article className="card kpi-card"><div className="kpi-top"><span>{label}</span><span className="kpi-icon" style={tone==='coral'?{background:'#fff0eb',color:'#c76a56'}:tone==='blue'?{background:'#edf3fb',color:'#6686b1'}:undefined}><Icon/></span></div><div className="kpi-value">{value}</div>{note&&<div className="kpi-note">{note}</div>}</article> }
 
 function ClinicContent({ path, session, activeTab, setActiveTab, query, setQuery, notify, openModal }: { path: string; session: Session; activeTab: string; setActiveTab: (tab: string) => void; query: string; setQuery: (query: string) => void; notify: (text: string) => void; openModal: OpenModal }) {
-  if (path===clinicPath) return <ClinicDashboard notify={notify}/>
+  if (path===clinicPath) return <><WelcomeTeamCard tenantName={session.tenantName}/><ClinicDashboard notify={notify}/></>
   if (path==='/app/minha-agenda') return <ProfessionalDashboard notify={notify}/>
   if (path==='/app/agenda'||path==='/app/meus-atendimentos') return <AgendaPage professional={session.profile==='professional'} notify={notify} openModal={openModal}/>
   if (path==='/app/pacientes'||path==='/app/meus-pacientes') return <PatientsPage query={query} setQuery={setQuery} professional={session.profile==='professional'}/>
@@ -216,7 +217,7 @@ function ClinicContent({ path, session, activeTab, setActiveTab, query, setQuery
   if (path==='/app/auditoria') return <AuditPage />
   if (path==='/app/relatorios') return <ReportsPage notify={notify}/>
   if (path==='/app/convenios') return <PlansPage />
-  if (path==='/app/usuarios') return <UsersPage />
+  if (path==='/app/usuarios') return <TeamPage />
   if (path==='/app/configuracoes') return <SettingsPage notify={notify}/>
   if (path==='/app/documentos') return <DocumentsPage />
   return <ClinicDashboard notify={notify}/>

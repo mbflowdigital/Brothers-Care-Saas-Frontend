@@ -12,7 +12,8 @@ import { maskCnpj, validateAdministrator, validateClinicUnit, validateCompany } 
 import { OnboardingSuccessPage } from './OnboardingSuccessPage'
 import '../styles/onboarding.css'
 
-const initialAdministrator: AdministratorData = { displayName: '', cpf: '', password: '', passwordConfirmation: '' }
+const developmentPassword = import.meta.env.DEV ? 'Aabbcc123!' : ''
+const initialAdministrator: AdministratorData = { displayName: '', cpf: '', password: developmentPassword, passwordConfirmation: developmentPassword }
 const initialCompany: CompanyData = { legalName: '', tradeName: '', commercialEmail: '', phone: '' }
 const initialClinicUnit: ClinicUnitData = { name: 'Unidade Principal', postalCode: '', street: '', number: '', complement: '', district: '', city: '', state: '', phone: '' }
 

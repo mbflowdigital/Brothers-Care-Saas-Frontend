@@ -84,10 +84,12 @@ export async function createTenant(tenantName: string, administratorEmail: strin
 }
 
 export type TenantListItem = { id: string; name: string; cnpj?: string; status: string; firstAdministratorStatus: string; responsibleName?: string; responsibleEmail?: string }
-export async function listTenants(search = ''): Promise<TenantListItem[]> {
-  const response = await fetch(`${apiBaseUrl}/tenants?search=${encodeURIComponent(search)}`, { credentials: 'include' })
+export type TenantPage = { items: TenantListItem[]; page: number; pageSize: number; totalItems: number; totalPages: number; pendingCount: number; activeCount: number }
+export async function listTenants(search = '', page = 1, pageSize = 10): Promise<TenantPage> {
+  const parameters = new URLSearchParams({ search, page: String(page), pageSize: String(pageSize) })
+  const response = await fetch(`${apiBaseUrl}/tenants?${parameters}`, { credentials: 'include' })
   if (!response.ok) throw new Error('Não foi possível carregar as empresas.')
-  return response.json() as Promise<TenantListItem[]>
+  return response.json() as Promise<TenantPage>
 }
 
 export type TenantPreRegistrationInput = { companyName: string; cnpj: string; responsibleName: string; responsibleEmail: string }
@@ -103,7 +105,11 @@ async function preRegistrationRequest(path: string, method: 'POST' | 'PUT' | 'DE
   throw new Error(problem?.title ?? 'Não foi possível concluir a operação.')
 }
 
-export async function createPreRegistration(input: TenantPreRegistrationInput): Promise<void> { await preRegistrationRequest('', 'POST', input) }
+export type TenantPreRegistrationResult = { tenantId: string; status: string; developmentOnboardingUrl?: string }
+export async function createPreRegistration(input: TenantPreRegistrationInput): Promise<TenantPreRegistrationResult> {
+  const response = await preRegistrationRequest('', 'POST', input)
+  return response.json() as Promise<TenantPreRegistrationResult>
+}
 export async function updatePreRegistration(id: string, input: TenantPreRegistrationInput): Promise<void> { await preRegistrationRequest(`/${id}`, 'PUT', input) }
 export async function cancelPreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}`, 'DELETE') }
 export async function resendPreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}/resend`, 'POST') }

@@ -3,9 +3,9 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 export type TeamRole = 'ClinicAdministrator' | 'Professional' | 'Receptionist'
 export type TeamStatus = 'Active' | 'Invited' | 'Suspended' | 'Revoked'
 export type TeamUnit = { id: string; name: string }
-export type TeamMember = { membershipId: string; userId: string; displayName: string; email: string; role: TeamRole; status: TeamStatus; createdAt: string; units: TeamUnit[]; isCurrentUser: boolean }
+export type TeamMember = { membershipId: string; userId: string; displayName: string; email: string; role: TeamRole; status: TeamStatus; createdAt: string; units: TeamUnit[]; isCurrentUser: boolean; performsCare: boolean; specialty?: string; councilType?: string; registrationNumber?: string }
 export type ClinicUnit = { id: string; name: string; isActive: boolean }
-export type InviteTeamMember = { displayName: string; email: string; role: TeamRole; clinicUnitIds: string[] }
+export type InviteTeamMember = { displayName: string; email: string; role: TeamRole; clinicUnitIds: string[]; performsCare: boolean; specialty: string; councilType: string; registrationNumber: string }
 
 async function problem(response: Response, fallback: string): Promise<never> {
   const body = await response.json().catch(() => null) as { title?: string } | null
@@ -38,7 +38,7 @@ export async function inviteTeamMember(input: InviteTeamMember) {
   if (!response.ok) return problem(response, 'Não foi possível enviar o convite.')
 }
 
-export async function updateTeamMember(membershipId: string, input: Pick<InviteTeamMember, 'role' | 'clinicUnitIds'>) {
+export async function updateTeamMember(membershipId: string, input: Pick<InviteTeamMember, 'role' | 'clinicUnitIds' | 'performsCare' | 'specialty' | 'councilType' | 'registrationNumber'>) {
   const response = await fetch(`${apiBaseUrl}/team-members/${membershipId}`, { method: 'PATCH', credentials: 'include', headers: await secureHeaders(), body: JSON.stringify(input) })
   if (!response.ok) return problem(response, 'Não foi possível atualizar este acesso.')
 }

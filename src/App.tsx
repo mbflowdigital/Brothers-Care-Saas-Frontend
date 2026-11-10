@@ -9,7 +9,6 @@ import { AccountActionPage } from './features/identity/AccountActionPage'
 import { LoginPage, toUiSession, type AuthenticatedUiSession } from './features/identity/LoginPage'
 import { TenantSelectionPage } from './features/identity/TenantSelectionPage'
 import { getCurrentSession, logout } from './features/identity/accountActionApi'
-import { CommercialOnboardingSection, type CommercialPlan } from './features/commercial/CommercialOnboardingSection'
 import { ClinicOnboardingPage } from './features/onboarding/pages/ClinicOnboardingPage'
 
 type Session = AuthenticatedUiSession
@@ -18,6 +17,7 @@ type ModalRequest = { title: string; content: string; kind?: 'partner' | 'profes
 type OpenModal = (modal: ModalRequest | null) => void
 const clinicPath = '/app/dashboard'
 const routeLabels: Record<string, string> = {
+  '/admin/pre-cadastros': 'Pré-cadastros',
   '/app/dashboard': 'Visão geral', '/app/agenda': 'Agenda', '/app/pacientes': 'Pacientes', '/app/profissionais': 'Profissionais', '/app/atendimentos': 'Atendimentos', '/app/evolucoes': 'Evoluções', '/app/financeiro': 'Financeiro', '/app/convenios': 'Convênios', '/app/comunicacao': 'Comunicação', '/app/relatorios': 'Relatórios', '/app/auditoria': 'Auditoria', '/app/usuarios': 'Usuários', '/app/configuracoes': 'Configurações', '/app/minha-agenda': 'Minha agenda', '/app/meus-pacientes': 'Meus pacientes', '/app/meus-atendimentos': 'Atendimentos', '/app/minhas-evolucoes': 'Evoluções', '/app/documentos': 'Documentos', '/admin': 'Visão geral', '/admin/empresas': 'Empresas', '/admin/assinaturas': 'Assinaturas', '/admin/planos': 'Planos', '/admin/tickets': 'Tickets', '/admin/atividade': 'Atividade global',
 }
 const clinicalNav = [
@@ -30,7 +30,7 @@ const professionalNav = [
   { label: 'ESPAÇO DE TRABALHO', items: [['/app/minha-agenda', 'Minha agenda', CalendarDays], ['/app/meus-pacientes', 'Meus pacientes', Users], ['/app/meus-atendimentos', 'Atendimentos', ClipboardCheck], ['/app/minhas-evolucoes', 'Evoluções', FileText], ['/app/documentos', 'Documentos', FileClock]] },
 ]
 const adminNav = [
-  { label: 'BROTHERS CARE', items: [['/admin', 'Visão geral', LayoutDashboard], ['/admin/empresas', 'Empresas', Home], ['/admin/assinaturas', 'Assinaturas', CreditCard], ['/admin/planos', 'Planos', Wallet], ['/admin/tickets', 'Tickets', MessageCircle], ['/admin/atividade', 'Atividade global', Activity]] },
+  { label: 'BROTHERS CARE', items: [['/admin', 'Visão geral', LayoutDashboard], ['/admin/pre-cadastros', 'Pré-cadastros', FileClock], ['/admin/empresas', 'Empresas', Home], ['/admin/assinaturas', 'Assinaturas', CreditCard], ['/admin/planos', 'Planos', Wallet], ['/admin/tickets', 'Tickets', MessageCircle], ['/admin/atividade', 'Atividade global', Activity]] },
 ]
 
 export default function App() {
@@ -88,19 +88,13 @@ function Brand({ inverse = false }: { inverse?: boolean }) { return <Link to="/"
 
 function Landing() {
   const [faqOpen, setFaqOpen] = useState<number | null>(0)
-  const plans: CommercialPlan[] = [
+  const plans = [
     { name: 'Starter', price: 'R$ 299/mês', description: 'Para clínicas que estão organizando a operação', features: ['Até 5 profissionais', 'Agenda e prontuário', 'Relatórios essenciais'] },
     { name: 'Professional', price: 'R$ 799/mês', description: 'Para equipes multidisciplinares em crescimento', features: ['Até 30 profissionais', 'Financeiro e convênios', 'Relatórios avançados'] },
     { name: 'Enterprise', price: 'Sob consulta', description: 'Para operações com necessidades próprias', features: ['Unidades e equipes flexíveis', 'Implantação acompanhada', 'Suporte prioritário'] },
   ]
-  const [selectedPlan, setSelectedPlan] = useState(plans[1])
-  const choosePlan = (plan: CommercialPlan) => {
-    if (plan.name === 'Enterprise') {
-      window.location.href = `mailto:comercial@brothers.digital?subject=${encodeURIComponent('Proposta Brothers Care Enterprise')}`
-      return
-    }
-    setSelectedPlan(plan)
-    window.setTimeout(() => document.getElementById('contratar')?.scrollIntoView({ behavior: 'smooth' }), 0)
+  const choosePlan = (plan: (typeof plans)[number]) => {
+    window.location.href = `mailto:comercial@brothers.digital?subject=${encodeURIComponent(`Apresentação Brothers Care · ${plan.name}`)}`
   }
   const features = [
     [Users, 'Pacientes', 'Histórico, documentos e jornada de cuidado em um só lugar.'], [UserRound, 'Profissionais', 'Equipe, especialidades, disponibilidade e produção conectadas.'], [CalendarDays, 'Agenda inteligente', 'Organize atendimentos presenciais e domiciliares.'], [FileText, 'Evolução clínica', 'Registros estruturados, seguros e sempre acessíveis.'], [Wallet, 'Financeiro', 'Acompanhe produção, repasses e recebimentos.'], [Shield, 'Auditoria', 'Rastreabilidade para uma gestão mais segura.'], [Activity, 'Relatórios', 'Indicadores que transformam operação em decisão.'], [MessageCircle, 'Comunicação', 'Lembretes e retornos com cuidado em cada detalhe.'],
@@ -112,17 +106,15 @@ function Landing() {
     ['Posso conhecer a plataforma antes de contratar?', 'Claro. Nossa equipe apresenta os fluxos mais importantes para a realidade da sua clínica.'],
   ]
   return <main className="public-page">
-    <header className="public-nav"><Brand /><nav className="public-links"><a href="#produto">Produto</a><a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#planos">Planos</a><a href="#faq">FAQ</a></nav><div className="public-cta"><Link to="/login" className="button button-outline">Entrar</Link><a href="#planos" className="button button-primary">Começar agora <ArrowRight size={14} /></a></div></header>
-    <section className="public-section hero" id="produto"><div className="hero-copy"><span className="hero-kicker"><span /> Cuidado conectado, gestão inteligente</span><h1>Sua clínica organizada. Sua equipe conectada. Sua gestão <em>no controle.</em></h1><p>Centralize pacientes, profissionais, atendimentos, evoluções clínicas e financeiro em uma única plataforma.</p><div className="hero-actions"><a className="button button-primary" href="#planos">Ver planos e começar <ArrowRight /></a><a className="button button-outline" href="#recursos">Conhecer plataforma <ArrowDownLeft /></a></div><div className="hero-proof"><Shield size={18} /><span><strong>Estrutura multiempresa</strong><br />com perfis, permissões e auditoria</span></div></div><DashboardMockup /></section>
+    <header className="public-nav"><Brand /><nav className="public-links"><a href="#produto">Produto</a><a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#planos">Planos</a><a href="#faq">FAQ</a></nav><div className="public-cta"><Link to="/login" className="button button-outline">Entrar</Link><a href="mailto:comercial@brothers.digital" className="button button-primary">Solicitar apresentação <ArrowRight size={14} /></a></div></header>
+    <section className="public-section hero" id="produto"><div className="hero-copy"><span className="hero-kicker"><span /> Cuidado conectado, gestão inteligente</span><h1>Sua clínica organizada. Sua equipe conectada. Sua gestão <em>no controle.</em></h1><p>Centralize pacientes, profissionais, atendimentos, evoluções clínicas e financeiro em uma única plataforma.</p><div className="hero-actions"><a className="button button-primary" href="mailto:comercial@brothers.digital">Solicitar apresentação <ArrowRight /></a><a className="button button-outline" href="#recursos">Conhecer plataforma <ArrowDownLeft /></a></div><div className="hero-proof"><Shield size={18} /><span><strong>Estrutura multiempresa</strong><br />com perfis, permissões e auditoria</span></div></div><DashboardMockup /></section>
     <section className="social-strip"><div className="social-inner"><div className="social-number"><strong>Uma operação</strong><span>do atendimento à gestão</span></div>{['Multiunidade', 'Perfis e permissões', 'Histórico auditável', 'Rotina integrada'].map((capability) => <div className="client-name" key={capability}>{capability}</div>)}</div></section>
     <section className="public-section" id="recursos"><div className="section-intro"><div className="eyebrow">Tudo conectado</div><h2>Uma rotina mais leve para quem cuida</h2><p>Da primeira consulta ao fechamento do mês, as informações fluem entre as pessoas e processos da sua clínica.</p></div><div className="feature-grid">{features.map(([Icon, title, description]) => <article className="feature-card" key={title}><div className="feature-icon"><Icon /></div><h3>{title}</h3><p>{description}</p></article>)}</div></section>
     <section className="social-strip"><div className="social-inner"><div className="social-number"><strong>Visão central</strong><span>da operação</span></div><div className="social-number"><strong>Agenda</strong><span>por equipe e unidade</span></div><div className="social-number"><strong>Prontuário</strong><span>com histórico</span></div><div className="social-number"><strong>Financeiro</strong><span>integrado à rotina</span></div><div className="social-number"><strong>Indicadores</strong><span>para decidir melhor</span></div></div></section>
     <section className="public-section steps-section" id="como-funciona"><div className="section-intro"><div className="eyebrow">Simples desde o primeiro dia</div><h2>Da organização ao cuidado, sem perder o ritmo</h2><p>Uma implantação que acompanha o jeito de trabalhar da sua clínica.</p></div><div className="steps-grid">{[['01','Configure sua empresa','Defina unidades, especialidades e regras de atendimento.'],['02','Cadastre sua equipe','Convide profissionais e organize agendas e permissões.'],['03','Organize seus pacientes','Reúna dados, planos terapêuticos e histórico em um lugar.'],['04','Acompanhe a operação','Veja indicadores, evoluções e financeiro em tempo real.']].map(([number,title,copy])=><article className="step-card" key={number}><span className="step-number">{number}</span><h3>{title}</h3><p>{copy}</p></article>)}</div></section>
     <section className="public-section"><div className="section-intro"><div className="eyebrow">Impacto na rotina</div><h2>Mais clareza em cada ponto da operação</h2></div><div className="quote-grid">{[['Recepção organizada','Agenda, confirmações e informações do paciente no mesmo fluxo.'],['Equipe conectada','Profissionais acompanham atendimentos e evoluções com o contexto certo.'],['Gestão presente','Indicadores operacionais e financeiros apoiam decisões sem depender de várias planilhas.']].map(([title,copy])=><article className="quote-card outcome-card" key={title}><CheckCircle2 /><h3>{title}</h3><p>{copy}</p></article>)}</div></section>
-    <section className="public-section" id="planos"><div className="section-intro"><div className="eyebrow">Planos que acompanham sua jornada</div><h2>O próximo passo da sua clínica</h2><p>Escolha o escopo ideal. Você poderá revisar tudo antes de confirmar.</p></div><div className="price-grid">{plans.map((plan,index)=><article className={`price-card ${index===1?'featured':''}`} key={plan.name}>{index===1&&<span className="price-tag">RECOMENDADO</span>}<h3>{plan.name}</h3><p>{plan.description}</p><div className="price-amount">{plan.price}</div><ul className="price-list">{plan.features.map((item)=><li key={item}><Check />{item}</li>)}</ul><button type="button" onClick={() => choosePlan(plan)} className={`button ${index===1?'button-primary':'button-outline'}`}>{plan.name === 'Enterprise' ? 'Solicitar proposta' : `Assinar ${plan.name}`}</button></article>)}</div></section>
+    <section className="public-section" id="planos"><div className="section-intro"><div className="eyebrow">Implantação acompanhada</div><h2>Encontre a configuração ideal para sua clínica</h2><p>Nossa equipe apresenta a plataforma e prepara seu acesso de acordo com a operação.</p></div><div className="price-grid">{plans.map((plan,index)=><article className={`price-card ${index===1?'featured':''}`} key={plan.name}>{index===1&&<span className="price-tag">MAIS ESCOLHIDO</span>}<h3>{plan.name}</h3><p>{plan.description}</p><div className="price-amount">{plan.price}</div><ul className="price-list">{plan.features.map((item)=><li key={item}><Check />{item}</li>)}</ul><button type="button" onClick={() => choosePlan(plan)} className={`button ${index===1?'button-primary':'button-outline'}`}>Falar com um especialista</button></article>)}</div></section>
     <section className="public-section" id="faq"><div className="section-intro"><div className="eyebrow">Perguntas frequentes</div><h2>O que você precisa saber</h2></div><div className="faq-list">{faqs.map(([question,answer],index)=><div className="faq-item" key={question}><button className="faq-question" onClick={()=>setFaqOpen(faqOpen===index?null:index)}>{question}{faqOpen===index?<X />:<Plus />}</button>{faqOpen===index&&<div className="faq-answer">{answer}</div>}</div>)}</div></section>
-    <section className="plan-selector" aria-label="Escolha o plano para contratação"><div><strong>Qual plano combina com sua operação?</strong><span>Selecione para iniciar o pré-cadastro.</span></div><div>{plans.map((plan) => <button key={plan.name} type="button" className={selectedPlan.name === plan.name ? 'active' : ''} onClick={() => choosePlan(plan)}><span>{plan.name}</span><strong>{plan.price}</strong></button>)}</div></section>
-    <CommercialOnboardingSection selectedPlan={selectedPlan} />
     <footer className="public-footer"><Brand /><span>© 2026 Brothers Digital. Tecnologia que aproxima o cuidado.</span><div className="footer-links"><Link to="/vitta">Instituto Vitta</Link><Link to="/login">Entrar</Link><a href="#faq">Privacidade</a></div></footer>
   </main>
 }

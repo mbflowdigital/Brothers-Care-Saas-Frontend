@@ -83,12 +83,30 @@ export async function createTenant(tenantName: string, administratorEmail: strin
   throw new Error(problem?.title ?? 'Não foi possível criar a empresa.')
 }
 
-export type TenantListItem = { id: string; name: string; status: string; firstAdministratorStatus: string }
+export type TenantListItem = { id: string; name: string; cnpj?: string; status: string; firstAdministratorStatus: string; responsibleName?: string; responsibleEmail?: string }
 export async function listTenants(search = ''): Promise<TenantListItem[]> {
   const response = await fetch(`${apiBaseUrl}/tenants?search=${encodeURIComponent(search)}`, { credentials: 'include' })
   if (!response.ok) throw new Error('Não foi possível carregar as empresas.')
   return response.json() as Promise<TenantListItem[]>
 }
+
+export type TenantPreRegistrationInput = { companyName: string; cnpj: string; responsibleName: string; responsibleEmail: string }
+
+async function preRegistrationRequest(path: string, method: 'POST' | 'PUT' | 'DELETE', payload?: object): Promise<Response> {
+  const csrfToken = await getCsrfToken()
+  const response = await fetch(`${apiBaseUrl}/tenant-pre-registrations${path}`, {
+    method, credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+    body: payload ? JSON.stringify(payload) : undefined,
+  })
+  if (response.ok) return response
+  const problem = await response.json().catch(() => null) as ProblemDetails | null
+  throw new Error(problem?.title ?? 'Não foi possível concluir a operação.')
+}
+
+export async function createPreRegistration(input: TenantPreRegistrationInput): Promise<void> { await preRegistrationRequest('', 'POST', input) }
+export async function updatePreRegistration(id: string, input: TenantPreRegistrationInput): Promise<void> { await preRegistrationRequest(`/${id}`, 'PUT', input) }
+export async function cancelPreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}`, 'DELETE') }
+export async function resendPreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}/resend`, 'POST') }
 
 export function activateAccount(token: string, cpf: string, password: string, passwordConfirmation: string) {
   return post('/auth/activation', { token, cpf, password, passwordConfirmation })

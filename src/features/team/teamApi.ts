@@ -3,7 +3,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 export type TeamRole = 'ClinicAdministrator' | 'Professional' | 'Receptionist'
 export type TeamStatus = 'Active' | 'Invited' | 'Suspended' | 'Revoked'
 export type TeamUnit = { id: string; name: string }
-export type TeamMember = { membershipId: string; userId: string; displayName: string; email: string; role: TeamRole; status: TeamStatus; createdAt: string; units: TeamUnit[] }
+export type TeamMember = { membershipId: string; userId: string; displayName: string; email: string; role: TeamRole; status: TeamStatus; createdAt: string; units: TeamUnit[]; isCurrentUser: boolean }
 export type ClinicUnit = { id: string; name: string; isActive: boolean }
 export type InviteTeamMember = { displayName: string; email: string; role: TeamRole; clinicUnitIds: string[] }
 
@@ -36,4 +36,14 @@ export async function listClinicUnits() {
 export async function inviteTeamMember(input: InviteTeamMember) {
   const response = await fetch(`${apiBaseUrl}/invitations`, { method: 'POST', credentials: 'include', headers: await secureHeaders(), body: JSON.stringify(input) })
   if (!response.ok) return problem(response, 'Não foi possível enviar o convite.')
+}
+
+export async function updateTeamMember(membershipId: string, input: Pick<InviteTeamMember, 'role' | 'clinicUnitIds'>) {
+  const response = await fetch(`${apiBaseUrl}/team-members/${membershipId}`, { method: 'PATCH', credentials: 'include', headers: await secureHeaders(), body: JSON.stringify(input) })
+  if (!response.ok) return problem(response, 'Não foi possível atualizar este acesso.')
+}
+
+export async function deactivateTeamMember(membershipId: string) {
+  const response = await fetch(`${apiBaseUrl}/team-members/${membershipId}/deactivation`, { method: 'POST', credentials: 'include', headers: await secureHeaders() })
+  if (!response.ok) return problem(response, 'Não foi possível desativar este acesso.')
 }

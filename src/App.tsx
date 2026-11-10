@@ -11,9 +11,15 @@ import { TenantSelectionPage } from './features/identity/TenantSelectionPage'
 import { getCurrentSession, logout } from './features/identity/accountActionApi'
 import { ClinicOnboardingPage } from './features/onboarding/pages/ClinicOnboardingPage'
 import { TeamPage, WelcomeTeamCard } from './features/team/TeamPage'
+import { ClinicGettingStarted, getWorkspaceSummary, type WorkspaceSummary } from './features/workspace/ClinicGettingStarted'
 
 type Session = AuthenticatedUiSession
-const sessionDestination = (session: Session) => session.profile === 'admin' ? '/admin' : !session.tenantId ? '/selecionar-empresa' : session.profile === 'professional' ? '/app/minha-agenda' : '/app/dashboard'
+const sessionDestination = (session: Session) => {
+  if (session.profile === 'admin') return '/admin'
+  if (!session.tenantId) return '/selecionar-empresa'
+  const role = session.memberships.find((item) => item.tenantId === session.tenantId)?.role
+  return role === 'Professional' ? '/app/minha-agenda' : role === 'Receptionist' ? '/app/agenda' : '/app/dashboard'
+}
 type ModalRequest = { title: string; content: string; kind?: 'partner' | 'professional' }
 type OpenModal = (modal: ModalRequest | null) => void
 const clinicPath = '/app/dashboard'
@@ -71,7 +77,7 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={session ? <Navigate to={sessionDestination(session)} replace /> : <LoginPage onLogin={signIn} />} />
       <Route path="/selecionar-empresa" element={session && session.profile !== 'admin' ? session.tenantId ? <Navigate to={sessionDestination(session)} replace /> : <TenantSelectionPage session={session} onSelect={signIn} /> : <Navigate to="/login" replace />} />
-      <Route path="/ativar-conta" element={<AccountActionPage mode="activation" />} />
+      <Route path="/ativar-conta" element={<AccountActionPage mode="activation" onAuthenticated={signIn} />} />
       <Route path="/recuperar-senha" element={<AccountActionPage mode="recovery" />} />
       <Route path="/onboarding" element={<ClinicOnboardingPage />} />
       <Route path="/vitta" element={<VittaPage onAction={() => notify('Nossa equipe entrará em contato em breve.')} />} />
@@ -224,6 +230,11 @@ function ClinicContent({ path, session, activeTab, setActiveTab, query, setQuery
 }
 
 function ClinicDashboard({ notify }: { notify: (text: string) => void }) {
+  const [workspaceSummary, setWorkspaceSummary] = useState<WorkspaceSummary | null>(null)
+  const [workspaceLoading, setWorkspaceLoading] = useState(true)
+  useEffect(() => { getWorkspaceSummary().then(setWorkspaceSummary).catch(() => notify('Não foi possível atualizar o início da clínica.')).finally(() => setWorkspaceLoading(false)) }, [])
+  if (workspaceLoading) return <PageSkeleton/>
+  if (workspaceSummary && workspaceSummary.appointments === 0) return <ClinicGettingStarted summary={workspaceSummary}/>
   const pieData = [{name:'Terapia Ocupacional',value:36,color:'#25c6a5'},{name:'Fisioterapia',value:27,color:'#79bfc0'},{name:'Fonoaudiologia',value:18,color:'#f0b35d'},{name:'Psicologia',value:12,color:'#e5806d'},{name:'Outros',value:7,color:'#9c9fb9'}]
   return <><div className="grid kpi-grid"><Kpi label="Pacientes ativos" value="186" note="↑ 8 novos este mês" icon={Users}/><Kpi label="Profissionais" value={String(professionals.length)} note="Equipe multidisciplinar" icon={Stethoscope} tone="blue"/><Kpi label="Atendimentos hoje" value="31" note="6 próximos na agenda" icon={CalendarDays}/><Kpi label="Atendimentos no mês" value="742" note={<><span className="up">↑ 3,6%</span> vs. mês anterior</>} icon={ClipboardCheck}/><Kpi label="Taxa de conclusão" value="94,6%" note="Meta mensal: 92%" icon={CheckCircle2}/><Kpi label="Faturamento previsto" value="R$ 78.450" note="Setembro · fechamento em andamento" icon={CircleDollarSign}/><Kpi label="Evoluções pendentes" value="7" note="2 aguardando revisão" icon={FileText} tone="coral"/><Kpi label="Pendências financeiras" value="12" note="R$ 4.280 em conferência" icon={AlertCircle} tone="coral"/></div><div className="grid dashboard-grid"><div className="card chart-card"><div className="card-heading"><div><h2>Atendimentos realizados</h2><p>Volume mensal da clínica</p></div><div className="chart-legend"><i/>Atendimentos</div></div><div className="chart-wrap"><ResponsiveContainer width="100%" height="100%"><AreaChart data={monthlyAppointments} margin={{top:8,right:5,left:-22,bottom:0}}><defs><linearGradient id="appointmentsGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#21d5b2" stopOpacity={.24}/><stop offset="90%" stopColor="#21d5b2" stopOpacity={0}/></linearGradient></defs><CartesianGrid stroke="#edf1f2" strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize:10,fill:'#93a0a5'}} dy={8}/><YAxis axisLine={false} tickLine={false} tick={{fontSize:9,fill:'#a1adb0'}}/><Tooltip contentStyle={{border:'1px solid #e7eeee',borderRadius:8,fontSize:10,boxShadow:'0 8px 20px #193a3015'}}/><Area type="monotone" dataKey="value" stroke="#25c4a3" strokeWidth={2.5} fill="url(#appointmentsGradient)" activeDot={{r:5,fill:'#25c4a3',stroke:'white',strokeWidth:2}}/></AreaChart></ResponsiveContainer></div></div><div className="side-stack"><div className="card distribution"><div className="card-heading"><div><h2>Atendimentos por especialidade</h2><p>Distribuição no mês</p></div><button className="icon-button" onClick={()=>notify('Distribuição atualizada')}><MoreHorizontal/></button></div><div style={{display:'flex',alignItems:'center',gap:14}}><div style={{width:112,height:112,flex:'none'}}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pieData} dataKey="value" innerRadius={34} outerRadius={51} paddingAngle={3} stroke="none">{pieData.map((entry)=><Cell key={entry.name} fill={entry.color}/>)}</Pie><Tooltip formatter={(value)=>`${value}%`} contentStyle={{fontSize:10,borderRadius:7}}/></PieChart></ResponsiveContainer></div><div className="distribution-list" style={{margin:0,flex:1}}>{pieData.map((item)=><div className="distribution-row" key={item.name}><span className="distribution-label"><i className="dot" style={{background:item.color}}/>{item.name}</span><span className="distribution-value">{item.value}%</span></div>)}</div></div></div><ActivityCard/></div></div><div className="card appointments-card" style={{marginTop:15}}><div className="card-heading"><div><h2>Próximos atendimentos</h2><p>Quarta-feira, 15 de outubro</p></div><Link className="link-button" to="/app/agenda">Ver agenda completa <ArrowRight size={12}/></Link></div><AppointmentList compact/></div></>
 }

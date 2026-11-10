@@ -112,6 +112,15 @@ export function activateAccount(token: string, cpf: string, password: string, pa
   return post('/auth/activation', { token, cpf, password, passwordConfirmation })
 }
 
+export type InvitationContext = { displayName: string; email: string; hasCpf: boolean; tenantId: string; tenantName: string; role: string; units: Array<{ id: string; name: string }>; expiresAt: string }
+export async function getInvitationContext(token: string): Promise<InvitationContext> {
+  const csrfToken = await getCsrfToken()
+  const response = await fetch(`${apiBaseUrl}/auth/invitation-context`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ token }) })
+  if (response.ok) return response.json() as Promise<InvitationContext>
+  const problem = await response.json().catch(() => null) as ProblemDetails | null
+  throw new Error(problem?.title ?? 'Este convite não está mais disponível.')
+}
+
 export function requestPasswordRecovery(email: string) {
   return post('/auth/password-recovery-requests', { email })
 }

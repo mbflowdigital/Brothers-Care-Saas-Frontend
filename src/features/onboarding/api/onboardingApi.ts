@@ -7,7 +7,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 async function parseFailure(response: Response): Promise<never> {
   const problem = await response.json().catch(() => null) as ProblemDetails | null
   const problemType = problem?.type?.toLowerCase() ?? ''
-  const state = problemType.includes('revoked') ? 'revoked' : problemType.includes('used') ? 'used' : problemType.includes('expired') ? 'expired' : response.status === 503 ? 'unavailable' : 'invalid'
+  const state = problemType.includes('cnpj-mismatch') ? 'cnpj-mismatch' : problemType.includes('revoked') ? 'revoked' : problemType.includes('used') ? 'used' : problemType.includes('expired') ? 'expired' : response.status === 503 ? 'unavailable' : 'invalid'
   throw new OnboardingApiError(state, problem?.title ?? 'Não foi possível validar o convite.')
 }
 
@@ -20,13 +20,13 @@ async function secureHeaders() {
 }
 
 const httpApi: OnboardingApi = {
-  async getContext(token: string): Promise<OnboardingContext> {
+  async getContext(token: string, cnpj: string): Promise<OnboardingContext> {
     const headers = await secureHeaders()
     const response = await fetch(`${apiBaseUrl}/onboarding/context`, {
       method: 'POST',
       credentials: 'include',
       headers,
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token, cnpj }),
     })
     if (!response.ok) return parseFailure(response)
     return response.json() as Promise<OnboardingContext>
@@ -52,6 +52,6 @@ async function selectedApi(): Promise<OnboardingApi> {
 }
 
 export const onboardingApi: OnboardingApi = {
-  async getContext(token) { return (await selectedApi()).getContext(token) },
+  async getContext(token, cnpj) { return (await selectedApi()).getContext(token, cnpj) },
   async complete(payload) { return (await selectedApi()).complete(payload) },
 }

@@ -10,6 +10,18 @@ export function maskCnpj(value: string) {
   return digits(value).slice(0, 14).replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2')
 }
 
+export function isValidCnpj(value: string) {
+  const cnpj = digits(value)
+  if (cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false
+  const calculate = (base: string, weights: number[]) => {
+    const remainder = base.split('').reduce((sum, digit, index) => sum + Number(digit) * weights[index], 0) % 11
+    return remainder < 2 ? 0 : 11 - remainder
+  }
+  const first = calculate(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+  const second = calculate(`${cnpj.slice(0, 12)}${first}`, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+  return cnpj.endsWith(`${first}${second}`)
+}
+
 export function maskPostalCode(value: string) {
   return digits(value).slice(0, 8).replace(/(\d{5})(\d{1,3})$/, '$1-$2')
 }
@@ -37,11 +49,10 @@ const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.tr
 
 export function validateAdministrator(data: AdministratorData): FieldErrors<AdministratorData> {
   const errors: FieldErrors<AdministratorData> = {}
-  const developmentBypass = import.meta.env.DEV && data.password === 'Aabbcc123!'
   if (!required(data.displayName)) errors.displayName = 'Informe o nome completo.'
   if (!isValidCpf(data.cpf)) errors.cpf = 'Informe um CPF válido.'
-  if (!developmentBypass && (data.password.length < 12 || data.password.length > 128 || !/[A-Za-zÀ-ÿ]/.test(data.password) || !/\d/.test(data.password))) {
-    errors.password = 'Use de 12 a 128 caracteres, com letras e números.'
+  if (data.password.length < 12 || data.password.length > 128 || !/[A-ZÀ-Þ]/.test(data.password) || !/[a-zß-ÿ]/.test(data.password) || !/\d/.test(data.password)) {
+    errors.password = 'Use de 12 a 128 caracteres, com letra maiúscula, minúscula e número.'
   }
   if (data.passwordConfirmation !== data.password) errors.passwordConfirmation = 'As senhas não coincidem.'
   return errors

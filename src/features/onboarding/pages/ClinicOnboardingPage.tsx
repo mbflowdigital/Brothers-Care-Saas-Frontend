@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Building2, HeartPulse, LoaderCircle, LockKeyhole, MapPin, RefreshCw, ShieldCheck, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { onboardingApi } from '../api/onboardingApi'
@@ -8,16 +8,17 @@ import { CompanyStep } from '../components/CompanyStep'
 import { OnboardingProgress } from '../components/OnboardingProgress'
 import type { AdministratorData, ClinicUnitData, CompanyData, FieldErrors, InvitationState, OnboardingContext, OnboardingFormData } from '../types'
 import { OnboardingApiError } from '../types'
-import { maskCnpj, validateAdministrator, validateClinicUnit, validateCompany } from '../validation'
+import { isValidCnpj, maskCnpj, validateAdministrator, validateClinicUnit, validateCompany } from '../validation'
 import { OnboardingSuccessPage } from './OnboardingSuccessPage'
 import '../styles/onboarding.css'
 
-const developmentPassword = import.meta.env.DEV ? 'Aabbcc123!' : ''
-const initialAdministrator: AdministratorData = { displayName: '', cpf: '', password: developmentPassword, passwordConfirmation: developmentPassword }
+const initialAdministrator: AdministratorData = { displayName: '', cpf: '', password: '', passwordConfirmation: '' }
 const initialCompany: CompanyData = { legalName: '', tradeName: '', commercialEmail: '', phone: '' }
 const initialClinicUnit: ClinicUnitData = { name: 'Unidade Principal', postalCode: '', street: '', number: '', complement: '', district: '', city: '', state: '', phone: '' }
 
 const invitationCopy: Record<Exclude<InvitationState, 'ready'>, { title: string; description: string }> = {
+  'cnpj-required': { title: 'Confirme o CNPJ', description: 'Informe o CNPJ cadastrado para validar este convite.' },
+  'cnpj-mismatch': { title: 'CNPJ não corresponde', description: 'Confira o CNPJ informado ou entre em contato com a equipe Brothers Care.' },
   invalid: { title: 'Convite inválido', description: 'Não foi possível reconhecer este convite. Confira se o link foi copiado por completo.' },
   expired: { title: 'Este convite expirou', description: 'Solicite um novo link para continuar o cadastro da clínica.' },
   revoked: { title: 'Convite revogado', description: 'Este convite não está mais disponível. Entre em contato com a equipe Brothers Care.' },
@@ -27,9 +28,10 @@ const invitationCopy: Record<Exclude<InvitationState, 'ready'>, { title: string;
 
 export function ClinicOnboardingPage() {
   const tokenRef = useRef(new URLSearchParams(window.location.search).get('token') ?? '')
-  const [invitationState, setInvitationState] = useState<InvitationState>('unavailable')
+  const [invitationState, setInvitationState] = useState<InvitationState>(tokenRef.current ? 'cnpj-required' : 'invalid')
   const [context, setContext] = useState<OnboardingContext | null>(null)
-  const [loadingContext, setLoadingContext] = useState(true)
+  const [loadingContext, setLoadingContext] = useState(false)
+  const [cnpj, setCnpj] = useState('')
   const [step, setStep] = useState(0)
   const [reviewing, setReviewing] = useState(false)
   const [administrator, setAdministrator] = useState(initialAdministrator)
@@ -40,11 +42,17 @@ export function ClinicOnboardingPage() {
   const [submitError, setSubmitError] = useState('')
   const [completed, setCompleted] = useState(false)
 
-  const loadContext = async () => {
+  const loadContext = async (cnpjValue: string) => {
+    if (!isValidCnpj(cnpjValue)) {
+      setInvitationState('cnpj-required')
+      return
+    }
+
     setLoadingContext(true)
     try {
-      const nextContext = await onboardingApi.getContext(tokenRef.current)
+      const nextContext = await onboardingApi.getContext(tokenRef.current, cnpjValue)
       setContext(nextContext)
+      setCnpj(nextContext.cnpj)
       setCompany((current) => ({ ...current, tradeName: current.tradeName || nextContext.companyName || '', commercialEmail: current.commercialEmail || nextContext.email }))
       setInvitationState('ready')
     } catch (caught) {
@@ -57,8 +65,13 @@ export function ClinicOnboardingPage() {
   useEffect(() => {
     const cleanUrl = `${window.location.pathname}${window.location.hash}`
     window.history.replaceState(window.history.state, '', cleanUrl)
-    void loadContext()
   }, [])
+
+  const validateCnpj = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setInvitationState('cnpj-required')
+    await loadContext(cnpj)
+  }
 
   const validateCurrent = () => {
     const nextErrors = step === 0 ? validateAdministrator(administrator) : step === 1 ? validateCompany(company) : validateClinicUnit(clinicUnit)
@@ -83,6 +96,8 @@ export function ClinicOnboardingPage() {
 
   const submit = async () => {
     setSubmitError('')
+    if (!context) return
+
     const validations = [validateAdministrator(administrator), validateCompany(company), validateClinicUnit(clinicUnit)]
     const invalidStep = validations.findIndex((validation) => Object.keys(validation).length > 0)
     if (invalidStep >= 0) {
@@ -95,7 +110,7 @@ export function ClinicOnboardingPage() {
     setSubmitting(true)
     const data: OnboardingFormData = { administrator, company, clinicUnit }
     try {
-      await onboardingApi.complete({ token: tokenRef.current, ...data })
+      await onboardingApi.complete({ token: tokenRef.current, cnpj: context.cnpj, ...data })
       setCompleted(true)
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Não foi possível concluir o cadastro. Tente novamente.')
@@ -104,10 +119,13 @@ export function ClinicOnboardingPage() {
     }
   }
 
-  if (loadingContext) return <OnboardingFrame><section className="onboarding-result" role="status"><LoaderCircle className="spin" /><h1>Validando seu convite…</h1><p>Estamos preparando o cadastro seguro da sua clínica.</p></section></OnboardingFrame>
+  if (loadingContext) return <OnboardingFrame><InvitationValidationLoading /></OnboardingFrame>
   if (invitationState !== 'ready' || !context) {
     const copy = invitationCopy[invitationState === 'ready' ? 'unavailable' : invitationState]
-    return <OnboardingFrame><section className="onboarding-result"><span className="onboarding-result-icon error"><LockKeyhole /></span><h1>{copy.title}</h1><p>{copy.description}</p><div className="onboarding-result-actions">{invitationState === 'unavailable' && <button className="button button-dark" onClick={() => void loadContext()}><RefreshCw />Tentar novamente</button>}<Link className="button button-outline" to="/login">Ir para o login</Link></div>{import.meta.env.DEV && <small className="development-note">Ambiente de desenvolvimento: use <code>?token=demo</code>, <code>expirado</code>, <code>revogado</code> ou <code>utilizado</code>.</small>}</section></OnboardingFrame>
+    if (invitationState === 'cnpj-required' || invitationState === 'cnpj-mismatch') {
+      return <OnboardingFrame><section className={`onboarding-result onboarding-validation ${invitationState === 'cnpj-mismatch' ? 'has-error' : ''}`}><span className={`onboarding-result-icon ${invitationState === 'cnpj-mismatch' ? 'error' : ''}`}><LockKeyhole /></span><div className="eyebrow">CONVITE PROTEGIDO</div><h1>{copy.title}</h1><p>{copy.description}</p><form className="onboarding-cnpj-form" onSubmit={(event) => void validateCnpj(event)}><div className="onboarding-cnpj-field"><label htmlFor="onboarding-cnpj">CNPJ da clínica</label><input id="onboarding-cnpj" value={maskCnpj(cnpj)} onChange={(event) => setCnpj(event.target.value)} inputMode="numeric" autoComplete="organization" placeholder="00.000.000/0000-00" maxLength={18} aria-invalid={invitationState === 'cnpj-mismatch'} autoFocus required /></div><button className="button button-dark" type="submit" disabled={loadingContext || !isValidCnpj(cnpj)}><ShieldCheck />Validar e continuar</button></form><div className="onboarding-security-points"><span><ShieldCheck />Seus dados são validados com segurança</span><span><HeartPulse />Leva poucos minutos para concluir</span></div><div className="onboarding-result-actions"><Link className="button button-outline" to="/login">Já tenho acesso</Link></div></section></OnboardingFrame>
+    }
+    return <OnboardingFrame><section className="onboarding-result"><span className="onboarding-result-icon error"><LockKeyhole /></span><h1>{copy.title}</h1><p>{copy.description}</p><div className="onboarding-result-actions">{invitationState === 'unavailable' && <button className="button button-dark" onClick={() => void loadContext(cnpj)}><RefreshCw />Tentar novamente</button>}<Link className="button button-outline" to="/login">Ir para o login</Link></div></section></OnboardingFrame>
   }
   if (completed) return <OnboardingFrame><OnboardingSuccessPage /></OnboardingFrame>
 
@@ -125,6 +143,17 @@ export function ClinicOnboardingPage() {
       <footer className="onboarding-card-foot"><button className="button button-outline" onClick={back} disabled={!reviewing && step === 0 || submitting}><ArrowLeft />Voltar</button>{reviewing ? <button className="button button-primary" onClick={() => void submit()} disabled={submitting}>{submitting ? <><LoaderCircle className="spin" />Concluindo…</> : <>Concluir cadastro <ShieldCheck /></>}</button> : <button className="button button-dark" onClick={next}>Avançar <ArrowRight /></button>}</footer>
     </section>
   </OnboardingFrame>
+}
+
+function InvitationValidationLoading() {
+  return <section className="onboarding-result onboarding-loading" role="status" aria-live="polite">
+    <div className="onboarding-loading-animation" aria-hidden="true"><span /><ShieldCheck /></div>
+    <div className="eyebrow">ACESSO SEGURO</div>
+    <h1>Validando seu convite</h1>
+    <p>Estamos confirmando os dados e preparando a jornada da sua clínica.</p>
+    <div className="onboarding-loading-track"><span /></div>
+    <small>Isso costuma levar apenas alguns segundos.</small>
+  </section>
 }
 
 function Review({ context, data, onEdit }: { context: OnboardingContext; data: OnboardingFormData; onEdit: (step: number) => void }) {

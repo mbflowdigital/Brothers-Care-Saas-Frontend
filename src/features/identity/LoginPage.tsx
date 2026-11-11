@@ -29,8 +29,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: AuthenticatedUiSessi
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const updateLogin = (value: string) => {
-    const normalized = value.toLowerCase()
-    setCpf(import.meta.env.DEV && 'admin'.startsWith(normalized) ? normalized : maskCpf(value))
+    setCpf(/[a-z]/i.test(value) ? value.trimStart().toLowerCase().slice(0, 40) : maskCpf(value))
   }
 
   async function submit(event: React.FormEvent) {

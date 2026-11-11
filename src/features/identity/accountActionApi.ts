@@ -11,7 +11,10 @@ export type AuthSessionSummary = {
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
 async function getCsrfToken(): Promise<string> {
-  const response = await fetch(`${apiBaseUrl}/auth/csrf-token`, { credentials: 'include' })
+  const response = await fetch(`${apiBaseUrl}/auth/csrf-token`, {
+    credentials: 'include',
+    signal: AbortSignal.timeout(10000),
+  })
   if (!response.ok) throw new Error('Não foi possível preparar a solicitação segura. Tente novamente.')
 
   const payload = await response.json() as { token?: string; headerName?: string }
@@ -87,7 +90,18 @@ export type TenantListItem = { id: string; name: string; cnpj?: string; status: 
 export type TenantPage = { items: TenantListItem[]; page: number; pageSize: number; totalItems: number; totalPages: number; pendingCount: number; activeCount: number }
 export async function listTenants(search = '', page = 1, pageSize = 10): Promise<TenantPage> {
   const parameters = new URLSearchParams({ search, page: String(page), pageSize: String(pageSize) })
-  const response = await fetch(`${apiBaseUrl}/tenants?${parameters}`, { credentials: 'include' })
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/tenants?${parameters}`, {
+      credentials: 'include',
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    if (caught instanceof DOMException && caught.name === 'TimeoutError') {
+      throw new Error('A consulta demorou mais que o esperado. Verifique a conexão e tente atualizar.')
+    }
+    throw new Error('Não foi possível conectar ao serviço de empresas. Tente novamente.')
+  }
   if (!response.ok) throw new Error('Não foi possível carregar as empresas.')
   return response.json() as Promise<TenantPage>
 }
@@ -95,24 +109,45 @@ export async function listTenants(search = '', page = 1, pageSize = 10): Promise
 export type TenantPreRegistrationInput = { companyName: string; cnpj: string; responsibleName: string; responsibleEmail: string }
 
 async function preRegistrationRequest(path: string, method: 'POST' | 'PUT' | 'DELETE', payload?: object): Promise<Response> {
-  const csrfToken = await getCsrfToken()
-  const response = await fetch(`${apiBaseUrl}/tenant-pre-registrations${path}`, {
-    method, credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-    body: payload ? JSON.stringify(payload) : undefined,
-  })
-  if (response.ok) return response
-  const problem = await response.json().catch(() => null) as ProblemDetails | null
-  throw new Error(problem?.title ?? 'Não foi possível concluir a operação.')
+  try {
+    const csrfToken = await getCsrfToken()
+    const response = await fetch(`${apiBaseUrl}/tenant-pre-registrations${path}`, {
+      method,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: payload ? JSON.stringify(payload) : undefined,
+      signal: AbortSignal.timeout(20000),
+    })
+    if (response.ok) return response
+    const problem = await response.json().catch(() => null) as ProblemDetails | null
+    const title = problem?.title?.trim()
+    throw new Error(title && !/^an error occurred while processing your request\.?$/i.test(title)
+      ? title
+      : 'Não foi possível concluir a operação. Tente novamente.')
+  } catch (caught) {
+    if (caught instanceof DOMException && caught.name === 'TimeoutError') {
+      throw new Error('A operação demorou mais que o esperado. Tente novamente.')
+    }
+    if (caught instanceof TypeError) {
+      throw new Error('Não foi possível conectar ao serviço. Verifique a conexão e tente novamente.')
+    }
+    throw caught
+  }
 }
 
-export type TenantPreRegistrationResult = { tenantId: string; status: string; developmentOnboardingUrl?: string }
+export type TenantPreRegistrationResult = { tenantId: string; status: string; onboardingUrl?: string | null }
+export type TenantPreRegistrationInvitationResult = { onboardingUrl?: string | null }
 export async function createPreRegistration(input: TenantPreRegistrationInput): Promise<TenantPreRegistrationResult> {
   const response = await preRegistrationRequest('', 'POST', input)
   return response.json() as Promise<TenantPreRegistrationResult>
 }
 export async function updatePreRegistration(id: string, input: TenantPreRegistrationInput): Promise<void> { await preRegistrationRequest(`/${id}`, 'PUT', input) }
 export async function cancelPreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}`, 'DELETE') }
-export async function resendPreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}/resend`, 'POST') }
+export async function deletePreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}/permanent`, 'DELETE') }
+export async function resendPreRegistration(id: string): Promise<TenantPreRegistrationInvitationResult> {
+  const response = await preRegistrationRequest(`/${id}/resend`, 'POST')
+  return response.json() as Promise<TenantPreRegistrationInvitationResult>
+}
 
 export function activateAccount(token: string, cpf: string, password: string, passwordConfirmation: string) {
   return post('/auth/activation', { token, cpf, password, passwordConfirmation })

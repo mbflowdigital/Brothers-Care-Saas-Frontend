@@ -1,4 +1,4 @@
-export type InvitationState = 'ready' | 'invalid' | 'expired' | 'revoked' | 'used' | 'unavailable'
+export type InvitationState = 'cnpj-required' | 'cnpj-mismatch' | 'ready' | 'invalid' | 'expired' | 'revoked' | 'used' | 'unavailable'
 
 export type OnboardingContext = {
   email: string
@@ -39,7 +39,7 @@ export type OnboardingFormData = {
   clinicUnit: ClinicUnitData
 }
 
-export type OnboardingCompletion = OnboardingFormData & { token: string }
+export type OnboardingCompletion = OnboardingFormData & { token: string; cnpj: string }
 
 export type OnboardingCompletionResult = {
   status: 'completed'
@@ -47,7 +47,7 @@ export type OnboardingCompletionResult = {
 }
 
 export interface OnboardingApi {
-  getContext(token: string): Promise<OnboardingContext>
+  getContext(token: string, cnpj: string): Promise<OnboardingContext>
   complete(payload: OnboardingCompletion): Promise<OnboardingCompletionResult>
 }
 

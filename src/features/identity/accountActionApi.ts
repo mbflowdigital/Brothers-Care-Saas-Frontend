@@ -43,8 +43,22 @@ async function postForSession(path: string, payload: object): Promise<AuthSessio
   throw new Error(problem?.title ?? 'Não foi possível entrar. Tente novamente.')
 }
 
-export function login(email: string, password: string) {
-  return postForSession('/auth/login', { email, password })
+export function login(cpf: string, password: string) {
+  return postForSession('/auth/login', { cpf, password })
+}
+
+export function selectActiveTenant(tenantId: string) {
+  return putForSession('/auth/active-tenant', { tenantId })
+}
+
+async function putForSession(path: string, payload: object): Promise<AuthSessionSummary> {
+  const csrfToken = await getCsrfToken()
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify(payload),
+  })
+  if (response.ok) return response.json() as Promise<AuthSessionSummary>
+  const problem = await response.json().catch(() => null) as ProblemDetails | null
+  throw new Error(problem?.title ?? 'Não foi possível selecionar a empresa.')
 }
 
 export async function getCurrentSession(): Promise<AuthSessionSummary | null> {
@@ -69,15 +83,48 @@ export async function createTenant(tenantName: string, administratorEmail: strin
   throw new Error(problem?.title ?? 'Não foi possível criar a empresa.')
 }
 
-export type TenantListItem = { id: string; name: string; status: string }
-export async function listTenants(search = ''): Promise<TenantListItem[]> {
-  const response = await fetch(`${apiBaseUrl}/tenants?search=${encodeURIComponent(search)}`, { credentials: 'include' })
+export type TenantListItem = { id: string; name: string; cnpj?: string; status: string; firstAdministratorStatus: string; responsibleName?: string; responsibleEmail?: string }
+export type TenantPage = { items: TenantListItem[]; page: number; pageSize: number; totalItems: number; totalPages: number; pendingCount: number; activeCount: number }
+export async function listTenants(search = '', page = 1, pageSize = 10): Promise<TenantPage> {
+  const parameters = new URLSearchParams({ search, page: String(page), pageSize: String(pageSize) })
+  const response = await fetch(`${apiBaseUrl}/tenants?${parameters}`, { credentials: 'include' })
   if (!response.ok) throw new Error('Não foi possível carregar as empresas.')
-  return response.json() as Promise<TenantListItem[]>
+  return response.json() as Promise<TenantPage>
 }
 
-export function activateAccount(token: string, password: string, passwordConfirmation: string) {
-  return post('/auth/activation', { token, password, passwordConfirmation })
+export type TenantPreRegistrationInput = { companyName: string; cnpj: string; responsibleName: string; responsibleEmail: string }
+
+async function preRegistrationRequest(path: string, method: 'POST' | 'PUT' | 'DELETE', payload?: object): Promise<Response> {
+  const csrfToken = await getCsrfToken()
+  const response = await fetch(`${apiBaseUrl}/tenant-pre-registrations${path}`, {
+    method, credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+    body: payload ? JSON.stringify(payload) : undefined,
+  })
+  if (response.ok) return response
+  const problem = await response.json().catch(() => null) as ProblemDetails | null
+  throw new Error(problem?.title ?? 'Não foi possível concluir a operação.')
+}
+
+export type TenantPreRegistrationResult = { tenantId: string; status: string; developmentOnboardingUrl?: string }
+export async function createPreRegistration(input: TenantPreRegistrationInput): Promise<TenantPreRegistrationResult> {
+  const response = await preRegistrationRequest('', 'POST', input)
+  return response.json() as Promise<TenantPreRegistrationResult>
+}
+export async function updatePreRegistration(id: string, input: TenantPreRegistrationInput): Promise<void> { await preRegistrationRequest(`/${id}`, 'PUT', input) }
+export async function cancelPreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}`, 'DELETE') }
+export async function resendPreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}/resend`, 'POST') }
+
+export function activateAccount(token: string, cpf: string, password: string, passwordConfirmation: string) {
+  return post('/auth/activation', { token, cpf, password, passwordConfirmation })
+}
+
+export type InvitationContext = { displayName: string; email: string; hasCpf: boolean; tenantId: string; tenantName: string; role: string; units: Array<{ id: string; name: string }>; expiresAt: string }
+export async function getInvitationContext(token: string): Promise<InvitationContext> {
+  const csrfToken = await getCsrfToken()
+  const response = await fetch(`${apiBaseUrl}/auth/invitation-context`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ token }) })
+  if (response.ok) return response.json() as Promise<InvitationContext>
+  const problem = await response.json().catch(() => null) as ProblemDetails | null
+  throw new Error(problem?.title ?? 'Este convite não está mais disponível.')
 }
 
 export function requestPasswordRecovery(email: string) {

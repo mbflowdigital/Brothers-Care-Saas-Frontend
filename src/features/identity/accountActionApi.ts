@@ -78,6 +78,19 @@ export async function logout(): Promise<void> {
   })
 }
 
+export async function changeCurrentPassword(currentPassword: string, newPassword: string, passwordConfirmation: string): Promise<void> {
+  const csrfToken = await getCsrfToken()
+  const response = await fetch(`${apiBaseUrl}/auth/password`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+    body: JSON.stringify({ currentPassword, newPassword, passwordConfirmation }),
+  })
+  if (response.ok) return
+  const problem = await response.json().catch(() => null) as ProblemDetails | null
+  throw new Error(problem?.title ?? 'Não foi possível alterar a senha. Tente novamente.')
+}
+
 export async function createTenant(tenantName: string, administratorEmail: string, administratorDisplayName: string, clinicUnitName: string) {
   const csrfToken = await getCsrfToken()
   const response = await fetch(`${apiBaseUrl}/tenants`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ tenantName, administratorEmail, administratorDisplayName, clinicUnitName: clinicUnitName || null }) })

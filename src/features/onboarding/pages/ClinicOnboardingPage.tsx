@@ -1,6 +1,8 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Building2, HeartPulse, LoaderCircle, LockKeyhole, MapPin, RefreshCw, ShieldCheck, UserRound } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { login } from '../../identity/accountActionApi'
+import { toUiSession, type AuthenticatedUiSession } from '../../identity/LoginPage'
 import { onboardingApi } from '../api/onboardingApi'
 import { AdministratorStep } from '../components/AdministratorStep'
 import { ClinicUnitStep } from '../components/ClinicUnitStep'
@@ -26,7 +28,13 @@ const invitationCopy: Record<Exclude<InvitationState, 'ready'>, { title: string;
   unavailable: { title: 'Serviço temporariamente indisponível', description: 'Não foi possível validar o convite agora. Tente novamente em alguns instantes.' },
 }
 
-export function ClinicOnboardingPage() {
+type ClinicOnboardingPageProps = {
+  hasPlatformAdministratorSession: boolean
+  onAuthenticated: (session: AuthenticatedUiSession) => void
+}
+
+export function ClinicOnboardingPage({ hasPlatformAdministratorSession, onAuthenticated }: ClinicOnboardingPageProps) {
+  const navigate = useNavigate()
   const tokenRef = useRef(
     new URLSearchParams(window.location.search).get('token')
       ?? (window.history.state?.onboardingToken as string | undefined)
@@ -45,6 +53,25 @@ export function ClinicOnboardingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [completed, setCompleted] = useState(false)
+  const [enteringClinic, setEnteringClinic] = useState(false)
+  const [entryError, setEntryError] = useState('')
+
+  const enterClinic = async () => {
+    setEntryError('')
+    setEnteringClinic(true)
+    try {
+      const session = toUiSession(await login(administrator.cpf, administrator.password))
+      onAuthenticated(session)
+      const role = session.memberships.find((membership) => membership.tenantId === session.tenantId)?.role
+      navigate(role === 'Professional' ? '/app/minha-agenda' : role === 'Receptionist' ? '/app/agenda' : '/app/dashboard', { replace: true })
+    } catch (caught) {
+      setEntryError(caught instanceof Error ? caught.message : 'Não foi possível entrar na nova clínica. Tente novamente.')
+    } finally {
+      setEnteringClinic(false)
+    }
+  }
+
+  const finishOnboarding = () => navigate(hasPlatformAdministratorSession ? '/admin/pre-cadastros' : '/login', { replace: true })
 
   const loadContext = async (cnpjValue: string) => {
     if (!isValidCnpj(cnpjValue)) {
@@ -128,7 +155,7 @@ export function ClinicOnboardingPage() {
     }
     return <OnboardingFrame><section className="onboarding-result"><span className="onboarding-result-icon error"><LockKeyhole /></span><h1>{copy.title}</h1><p>{copy.description}</p><div className="onboarding-result-actions">{invitationState === 'unavailable' && <button className="button button-dark" onClick={() => void loadContext(cnpj)}><RefreshCw />Tentar novamente</button>}<Link className="button button-outline" to="/login">Ir para o login</Link></div></section></OnboardingFrame>
   }
-  if (completed) return <OnboardingFrame><OnboardingSuccessPage /></OnboardingFrame>
+  if (completed) return <OnboardingFrame><OnboardingSuccessPage hasPlatformAdministratorSession={hasPlatformAdministratorSession} enteringClinic={enteringClinic} error={entryError} onEnterClinic={() => void enterClinic()} onFinish={finishOnboarding} /></OnboardingFrame>
 
   return <OnboardingFrame>
     <OnboardingProgress current={reviewing ? 3 : step} />

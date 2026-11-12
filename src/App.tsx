@@ -79,7 +79,7 @@ export default function App() {
       <Route path="/selecionar-empresa" element={session && session.profile !== 'admin' ? session.tenantId ? <Navigate to={sessionDestination(session)} replace /> : <TenantSelectionPage session={session} onSelect={signIn} /> : <Navigate to="/login" replace />} />
       <Route path="/ativar-conta" element={<AccountActionPage mode="activation" onAuthenticated={signIn} />} />
       <Route path="/recuperar-senha" element={<AccountActionPage mode="recovery" />} />
-      <Route path="/onboarding" element={<ClinicOnboardingPage />} />
+      <Route path="/onboarding" element={<ClinicOnboardingPage hasPlatformAdministratorSession={session?.profile === 'admin'} onAuthenticated={signIn} />} />
       <Route path="/vitta" element={<VittaPage onAction={() => notify('Nossa equipe entrará em contato em breve.')} />} />
       <Route path="/admin/*" element={session?.profile === 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/login" replace />} />
       <Route path="/app/*" element={session && session.profile !== 'admin' ? session.tenantId ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/selecionar-empresa" replace /> : <Navigate to="/login" replace />} />

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ArrowRight, Eye, EyeOff, HeartPulse, ShieldCheck } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Profile } from '../../data'
-import { login, type AuthSessionSummary } from './accountActionApi'
+import { login, selectActiveTenant, type AuthSessionSummary } from './accountActionApi'
 import { maskCpf } from '../onboarding/validation'
 
 export type AuthenticatedUiSession = {
@@ -35,7 +35,11 @@ export function LoginPage({ onLogin }: { onLogin: (session: AuthenticatedUiSessi
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setError(''); setLoading(true)
     try {
-      const session = toUiSession(await login(cpf, password)); onLogin(session)
+      let authenticated = await login(cpf, password)
+      if (!authenticated.platformAdministrator && !authenticated.activeTenant && authenticated.memberships.length === 1) {
+        authenticated = await selectActiveTenant(authenticated.memberships[0].tenantId)
+      }
+      const session = toUiSession(authenticated); onLogin(session)
       navigate(session.profile === 'admin' ? '/admin' : session.tenantId ? session.profile === 'professional' ? '/app/minha-agenda' : '/app/dashboard' : '/selecionar-empresa')
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Não foi possível entrar. Tente novamente.') }
     finally { setLoading(false) }

@@ -19,6 +19,7 @@ import {
   cancelPreRegistration,
   createPreRegistration,
   deletePreRegistration,
+  getPreRegistrationOnboardingLink,
   listTenants,
   resendPreRegistration,
   updatePreRegistration,
@@ -26,7 +27,7 @@ import {
   type TenantPreRegistrationInput,
 } from '../identity/accountActionApi'
 import { PreRegistrationActionMenu, type PreRegistrationAction } from './components/PreRegistrationActionMenu'
-import { CancelPreRegistrationDialog, DeletePreRegistrationDialog, OnboardingPreparationOverlay } from './components/PreRegistrationDialogs'
+import { CancelPreRegistrationDialog, DeletePreRegistrationDialog, OnboardingPreparationOverlay, PreRegistrationSuccessDialog } from './components/PreRegistrationDialogs'
 import { PreRegistrationFormModal } from './components/PreRegistrationFormModal'
 
 const emptyForm: TenantPreRegistrationInput = {
@@ -85,6 +86,7 @@ export function TenantPreRegistrationPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [cancelCandidate, setCancelCandidate] = useState<TenantListItem | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<TenantListItem | null>(null)
+  const [creationSuccess, setCreationSuccess] = useState<{ clinicName: string; onboardingUrl: string } | null>(null)
 
   const load = useCallback(async (): Promise<boolean> => {
     setLoading(true)
@@ -180,11 +182,30 @@ export function TenantPreRegistrationPage() {
         await updatePreRegistration(editingId, form)
       } else {
         const created = await createPreRegistration(form)
-        setOnboardingUrl(created.onboardingUrl ?? '')
+        const createdUrl = created.onboardingUrl ?? ''
+        const createdItem: TenantListItem = {
+          id: created.tenantId,
+          name: form.companyName.trim(),
+          cnpj: form.cnpj.replace(/\D/g, ''),
+          status: 'PendingOnboarding',
+          firstAdministratorStatus: 'Invited',
+          responsibleName: form.responsibleName.trim(),
+          responsibleEmail: form.responsibleEmail.trim(),
+        }
+        setOnboardingUrl(createdUrl)
+        setQuery('')
+        setPage(1)
+        setItems((current) => [createdItem, ...current.filter((item) => item.id !== createdItem.id)].slice(0, 10))
+        setTotalItems((current) => current + 1)
+        setTotalPages((current) => Math.max(current, Math.ceil((totalItems + 1) / 10)))
+        setPendingCount((current) => current + 1)
+        setOpen(false)
+        setCreationSuccess({ clinicName: createdItem.name, onboardingUrl: createdUrl })
+        return
       }
 
       setOpen(false)
-      const savedMessage = editingId ? 'Pré-cadastro atualizado.' : 'Pré-cadastro criado.'
+      const savedMessage = 'Pré-cadastro atualizado.'
       const refreshed = await load()
       setMessage(refreshed ? savedMessage : `${savedMessage} A lista não atualizou; use Atualizar para conferir.`)
       if (!refreshed) setError('')
@@ -264,7 +285,7 @@ export function TenantPreRegistrationPage() {
     setBusyActionKind('copy')
 
     try {
-      const result = await resendPreRegistration(item.id)
+      const result = await getPreRegistrationOnboardingLink(item.id)
       const url = result.onboardingUrl
       if (!url) {
         setError('O convite foi enviado, mas a URL não está configurada neste ambiente.')
@@ -293,7 +314,7 @@ export function TenantPreRegistrationPage() {
     setBusyActionKind('open')
 
     try {
-      const result = await resendPreRegistration(item.id)
+      const result = await getPreRegistrationOnboardingLink(item.id)
       const url = result.onboardingUrl
 
       if (!url) {
@@ -516,6 +537,14 @@ export function TenantPreRegistrationPage() {
         busy={busyActionId === deleteCandidate.id && busyActionKind === 'delete'}
         onCancel={() => setDeleteCandidate(null)}
         onConfirm={() => void permanentlyDelete(deleteCandidate)}
+      />}
+      {creationSuccess && <PreRegistrationSuccessDialog
+        clinicName={creationSuccess.clinicName}
+        onboardingUrl={creationSuccess.onboardingUrl}
+        onClose={() => {
+          setCreationSuccess(null)
+          setMessage('Pré-cadastro criado e convite preparado com sucesso.')
+        }}
       />}
       {busyActionId && busyActionKind === 'open' && <OnboardingPreparationOverlay
         clinicName={items.find((item) => item.id === busyActionId)?.name ?? 'a clínica'}

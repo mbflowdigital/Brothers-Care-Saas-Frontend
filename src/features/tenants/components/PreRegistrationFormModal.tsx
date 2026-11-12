@@ -1,4 +1,4 @@
-import { LoaderCircle, X } from 'lucide-react'
+import { LoaderCircle, ShieldCheck, X } from 'lucide-react'
 import { useEffect, type FormEvent } from 'react'
 import type { TenantPreRegistrationInput } from '../../identity/accountActionApi'
 
@@ -37,6 +37,12 @@ export function PreRegistrationFormModal({ editing, form, saving, error, onChang
       <h2 id="pre-registration-title">{editing ? 'Editar pré-cadastro' : 'Novo pré-cadastro'}</h2>
       <p>O responsável receberá um convite para completar o cadastro e configurar a primeira unidade.</p>
 
+      {saving && <div className="pre-registration-saving" role="status" aria-live="polite">
+        <span><LoaderCircle className="spin" /></span>
+        <div><strong>{editing ? 'Salvando as alterações' : 'Criando o pré-cadastro'}</strong><small>{editing ? 'Estamos atualizando os dados da clínica.' : 'Estamos protegendo o convite e preparando o onboarding.'}</small></div>
+        <ShieldCheck />
+      </div>}
+
       <form onSubmit={onSubmit}>
         <div className="form-grid">
           <div className="field full"><label htmlFor="company-name">Nome da clínica</label><input id="company-name" value={form.companyName} onChange={(event) => update('companyName', event.target.value)} maxLength={200} required autoFocus /></div>
@@ -48,7 +54,7 @@ export function PreRegistrationFormModal({ editing, form, saving, error, onChang
         <div className="form-footer">
           <button type="button" className="button button-outline" onClick={onClose} disabled={saving}>Cancelar</button>
           <button className="button button-primary" disabled={saving}>
-            {saving ? <><LoaderCircle className="spin" />Salvando...</> : editing ? 'Salvar alterações' : 'Cadastrar e enviar convite'}
+            {saving ? <><LoaderCircle className="spin" />Aguarde um instante...</> : editing ? 'Salvar alterações' : 'Criar pré-cadastro'}
           </button>
         </div>
       </form>

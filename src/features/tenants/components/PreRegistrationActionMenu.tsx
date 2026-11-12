@@ -71,7 +71,7 @@ export function PreRegistrationActionMenu({
     {open && createPortal(<div className="table-action-menu table-action-menu-portal" style={position} role="menu" aria-label={`Ações de ${item.name}`}>
       <div className="table-action-menu-head"><span>Ações do pré-cadastro</span><strong>{item.name}</strong></div>
       <ActionButton action="copy" activeAction={busyAction} icon={copied ? <CircleCheck /> : <Copy />} onAction={onAction}>
-        {copied ? 'Link copiado' : 'Gerar e copiar novo link'}
+        {copied ? 'Link copiado' : 'Copiar link de onboarding'}
       </ActionButton>
       <button type="button" role="menuitem" onClick={onEdit} disabled={busy}>
         <PencilLine />Editar
@@ -114,7 +114,7 @@ function ActionButton({
 
 const actionLabel: Record<PreRegistrationAction, string> = {
   open: 'Preparando onboarding...',
-  copy: 'Gerando link...',
+  copy: 'Buscando link...',
   resend: 'Enviando convite...',
   cancel: 'Cancelando...',
   delete: 'Excluindo...',

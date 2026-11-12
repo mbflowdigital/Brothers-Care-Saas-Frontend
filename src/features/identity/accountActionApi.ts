@@ -144,6 +144,15 @@ export async function createPreRegistration(input: TenantPreRegistrationInput): 
 export async function updatePreRegistration(id: string, input: TenantPreRegistrationInput): Promise<void> { await preRegistrationRequest(`/${id}`, 'PUT', input) }
 export async function cancelPreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}`, 'DELETE') }
 export async function deletePreRegistration(id: string): Promise<void> { await preRegistrationRequest(`/${id}/permanent`, 'DELETE') }
+export async function getPreRegistrationOnboardingLink(id: string): Promise<TenantPreRegistrationInvitationResult> {
+  const response = await fetch(`${apiBaseUrl}/tenant-pre-registrations/${id}/onboarding-link`, {
+    credentials: 'include',
+    signal: AbortSignal.timeout(15000),
+  })
+  if (response.ok) return response.json() as Promise<TenantPreRegistrationInvitationResult>
+  const problem = await response.json().catch(() => null) as ProblemDetails | null
+  throw new Error(problem?.title ?? 'Não foi possível obter o link de onboarding.')
+}
 export async function resendPreRegistration(id: string): Promise<TenantPreRegistrationInvitationResult> {
   const response = await preRegistrationRequest(`/${id}/resend`, 'POST')
   return response.json() as Promise<TenantPreRegistrationInvitationResult>

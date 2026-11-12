@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, LoaderCircle, Mail, ShieldCheck, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, Copy, LoaderCircle, Mail, ShieldCheck, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { TenantListItem } from '../../identity/accountActionApi'
 
@@ -98,6 +98,49 @@ export function OnboardingPreparationOverlay({ clinicName }: { clinicName: strin
         <span><Mail />Abrindo a jornada da clínica</span>
       </div>
       <small>Isso costuma levar apenas alguns segundos.</small>
+    </section>
+  </div>
+}
+
+export function PreRegistrationSuccessDialog({
+  clinicName,
+  onboardingUrl,
+  onClose,
+}: {
+  clinicName: string
+  onboardingUrl: string
+  onClose: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [onClose])
+
+  const copyLink = async () => {
+    if (!onboardingUrl) return
+    await navigator.clipboard.writeText(onboardingUrl)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1800)
+  }
+
+  return <div className="modal-backdrop confirmation-backdrop" role="presentation">
+    <section className="confirmation-dialog pre-registration-success-dialog" role="dialog" aria-modal="true" aria-labelledby="pre-registration-success-title">
+      <button className="modal-close" type="button" onClick={onClose} aria-label="Fechar"><X /></button>
+      <span className="confirmation-dialog-icon success"><CheckCircle2 /></span>
+      <div className="eyebrow">PRÉ-CADASTRO CONCLUÍDO</div>
+      <h2 id="pre-registration-success-title">Tudo pronto para {clinicName}</h2>
+      <p>A clínica foi adicionada no topo da lista e o convite seguro de onboarding já está disponível.</p>
+      <div className="success-dialog-note"><ShieldCheck /><span><strong>{onboardingUrl ? 'Link protegido gerado' : 'Pré-cadastro salvo'}</strong><small>{onboardingUrl ? 'O responsável poderá completar o cadastro e criar seu acesso.' : 'O convite poderá ser acessado pelas ações da lista.'}</small></span></div>
+      {onboardingUrl && <div className="confirmation-dialog-actions success-dialog-actions">
+        <button className="button button-outline" type="button" onClick={() => void copyLink()}>{copied ? <><Check />Link copiado</> : <><Copy />Copiar link</>}</button>
+        <a className="button button-primary" href={onboardingUrl}>Iniciar onboarding <ArrowRight /></a>
+      </div>}
+      <button className="success-dialog-finish" type="button" onClick={onClose}>Concluir e voltar à lista</button>
     </section>
   </div>
 }

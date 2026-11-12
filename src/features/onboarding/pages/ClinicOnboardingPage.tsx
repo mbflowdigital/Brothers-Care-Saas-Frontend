@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Building2, HeartPulse, LoaderCircle, LockKeyhole, MapPin, RefreshCw, ShieldCheck, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { onboardingApi } from '../api/onboardingApi'
@@ -27,7 +27,11 @@ const invitationCopy: Record<Exclude<InvitationState, 'ready'>, { title: string;
 }
 
 export function ClinicOnboardingPage() {
-  const tokenRef = useRef(new URLSearchParams(window.location.search).get('token') ?? '')
+  const tokenRef = useRef(
+    new URLSearchParams(window.location.search).get('token')
+      ?? (window.history.state?.onboardingToken as string | undefined)
+      ?? '',
+  )
   const [invitationState, setInvitationState] = useState<InvitationState>(tokenRef.current ? 'cnpj-required' : 'invalid')
   const [context, setContext] = useState<OnboardingContext | null>(null)
   const [loadingContext, setLoadingContext] = useState(false)
@@ -55,17 +59,14 @@ export function ClinicOnboardingPage() {
       setCnpj(nextContext.cnpj)
       setCompany((current) => ({ ...current, tradeName: current.tradeName || nextContext.companyName || '', commercialEmail: current.commercialEmail || nextContext.email }))
       setInvitationState('ready')
+      const cleanUrl = `${window.location.pathname}${window.location.hash}`
+      window.history.replaceState({ ...window.history.state, onboardingToken: tokenRef.current }, '', cleanUrl)
     } catch (caught) {
       setInvitationState(caught instanceof OnboardingApiError ? caught.state : 'unavailable')
     } finally {
       setLoadingContext(false)
     }
   }
-
-  useEffect(() => {
-    const cleanUrl = `${window.location.pathname}${window.location.hash}`
-    window.history.replaceState(window.history.state, '', cleanUrl)
-  }, [])
 
   const validateCnpj = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

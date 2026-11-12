@@ -340,9 +340,11 @@ export function TenantPreRegistrationPage() {
     else setDeleteCandidate(item)
   }
 
+  const showTable = loading || totalItems > 0 || query.trim().length > 0
+
   return (
     <>
-      <div className="pre-registration-summary">
+      {totalItems > 0 && <div className="pre-registration-summary">
         <article>
           <span>
             <Building2 />
@@ -363,11 +365,11 @@ export function TenantPreRegistrationPage() {
           </div>
         </article>
 
-        <button className="button button-primary" onClick={beginCreate} type="button">
+        {totalItems > 0 && <button className="button button-primary" onClick={beginCreate} type="button">
           <Plus />
-          Novo pré-cadastro
-        </button>
-      </div>
+          Cadastrar clínica
+        </button>}
+      </div>}
 
       {(message || (error && !open)) && (
         <div className={`pre-registration-feedback ${error && !message ? 'is-error' : 'is-success'}`} role={error && !message ? 'alert' : 'status'}>
@@ -393,7 +395,7 @@ export function TenantPreRegistrationPage() {
       )}
 
       <section className="card table-card">
-        <div className="table-toolbar">
+        {showTable && <div className="table-toolbar">
           <label className="searchbox">
             <Search />
             <input
@@ -416,9 +418,9 @@ export function TenantPreRegistrationPage() {
             {loading ? <LoaderCircle className="spin" /> : <RefreshCw />}
             {loading ? 'Atualizando...' : 'Atualizar'}
           </button>
-        </div>
+        </div>}
 
-        <div className="table-wrap">
+        {showTable && <div className="table-wrap">
           <table>
             <thead>
               <tr>
@@ -487,23 +489,20 @@ export function TenantPreRegistrationPage() {
             </tbody>
           </table>
 
-          {!loading && items.length === 0 && (
-            <div className="empty-state">
-              <Building2 />
-              <h3>{query ? 'Nenhuma clínica encontrada' : 'Nenhum pré-cadastro encontrado'}</h3>
-              <p>{query ? 'Tente buscar por outro nome.' : 'Cadastre a primeira clínica para iniciar o onboarding.'}</p>
-              {!query && (
-                <button className="button button-primary" onClick={beginCreate} type="button">
-                  <Plus />
-                  Cadastrar clínica
-                </button>
-              )}
-            </div>
-          )}
+        </div>}
 
-        </div>
+        {!loading && items.length === 0 && (
+          <div className={`pre-registration-empty ${query ? 'is-search' : ''}`}>
+            <span className="pre-registration-empty-icon"><Building2 /></span>
+            <small>{query ? 'BUSCA SEM RESULTADOS' : 'COMECE POR AQUI'}</small>
+            <h3>{query ? 'Nenhuma clínica encontrada' : 'Cadastre sua primeira clínica'}</h3>
+            <p>{query ? 'Tente buscar por outro nome ou limpe o filtro.' : 'Crie o pré-cadastro e acompanhe toda a ativação em um fluxo simples e seguro.'}</p>
+            {!query && <div className="activation-preview" aria-label="Etapas da ativação"><span><i>1</i>Pré-cadastro</span><ArrowRight /><span><i>2</i>Convite</span><ArrowRight /><span><i>3</i>Onboarding</span><ArrowRight /><span><i>4</i>Clínica ativa</span></div>}
+            {query ? <button className="button button-outline" onClick={() => setQuery('')} type="button">Limpar busca</button> : <button className="button button-primary" onClick={beginCreate} type="button"><Plus />Cadastrar clínica</button>}
+          </div>
+        )}
 
-        <div className="table-footer">
+        {totalItems > 0 && <div className="table-footer">
           <span>Página {page} de {totalPages || 1}</span>
           <div className="pagination">
             <button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} aria-label="Voltar página" type="button">
@@ -514,7 +513,7 @@ export function TenantPreRegistrationPage() {
               <ChevronRight />
             </button>
           </div>
-        </div>
+        </div>}
       </section>
 
       {open && <PreRegistrationFormModal

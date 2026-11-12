@@ -18,12 +18,13 @@ export const mockOnboardingApi: OnboardingApi = {
       email: 'mariana@clinicaexemplo.com.br',
       cnpj: '11222333000181',
       companyName: 'Clínica Exemplo',
+      requiresExistingPassword: false,
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     }
   },
   async complete(payload) {
     await wait()
     if (payload.cnpj.replace(/\D/g, '') !== '11222333000181') throw new OnboardingApiError('cnpj-mismatch', 'O CNPJ não corresponde ao pré-cadastro deste convite.')
-    return { status: 'completed', nextAction: 'login' }
+    return { status: 'completed', nextAction: 'login', tenantId: '00000000-0000-0000-0000-000000000001' }
   },
 }

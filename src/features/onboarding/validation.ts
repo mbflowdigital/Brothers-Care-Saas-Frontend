@@ -47,14 +47,16 @@ export function isValidCpf(value: string) {
 const required = (value: string) => value.trim().length > 0
 const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 
-export function validateAdministrator(data: AdministratorData): FieldErrors<AdministratorData> {
+export function validateAdministrator(data: AdministratorData, requiresExistingPassword = false): FieldErrors<AdministratorData> {
   const errors: FieldErrors<AdministratorData> = {}
   if (!required(data.displayName)) errors.displayName = 'Informe o nome completo.'
   if (!isValidCpf(data.cpf)) errors.cpf = 'Informe um CPF válido.'
-  if (data.password.length < 12 || data.password.length > 128 || !/[A-ZÀ-Þ]/.test(data.password) || !/[a-zß-ÿ]/.test(data.password) || !/\d/.test(data.password)) {
+  if (requiresExistingPassword && (data.password.length === 0 || data.password.length > 128)) {
+    errors.password = 'Informe sua senha atual.'
+  } else if (!requiresExistingPassword && (data.password.length < 12 || data.password.length > 128 || !/[A-ZÀ-Þ]/.test(data.password) || !/[a-zß-ÿ]/.test(data.password) || !/\d/.test(data.password))) {
     errors.password = 'Use de 12 a 128 caracteres, com letra maiúscula, minúscula e número.'
   }
-  if (data.passwordConfirmation !== data.password) errors.passwordConfirmation = 'As senhas não coincidem.'
+  if (!requiresExistingPassword && data.passwordConfirmation !== data.password) errors.passwordConfirmation = 'As senhas não coincidem.'
   return errors
 }
 

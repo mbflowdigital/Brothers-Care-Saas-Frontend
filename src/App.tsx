@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { Activity, AlertCircle, ArrowDownLeft, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, Clock3, Command, CreditCard, FileClock, FileText, Filter, HeartPulse, Home, LayoutDashboard, LogOut, Mail, Menu, MessageCircle, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Shield, Sparkles, Stethoscope, UserCog, UserRound, Users, Wallet, X } from 'lucide-react'
+import { Activity, AlertCircle, ArrowDownLeft, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, Clock3, Command, CreditCard, FileClock, FileText, Filter, HeartPulse, Home, LayoutDashboard, LogOut, Menu, MessageCircle, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Shield, Sparkles, Stethoscope, UserCog, UserRound, Users, Wallet, X } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { appointments, evolutions, monthlyAppointments, patients, professionals, type Profile } from './data'
 import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PartnerForm, PlansPage, ProfessionalForm, ReportsPage, SettingsPage } from './ExtraViews'
@@ -29,8 +29,8 @@ const routeLabels: Record<string, string> = {
 }
 const clinicalNav = [
   { label: 'VISÃO GERAL', items: [['/app/dashboard', 'Visão geral', LayoutDashboard]] },
-  { label: 'OPERAÇÃO CLÍNICA', items: [['/app/agenda', 'Agenda', CalendarDays], ['/app/pacientes', 'Pacientes', Users], ['/app/profissionais', 'Profissionais', Stethoscope], ['/app/atendimentos', 'Atendimentos', ClipboardCheck], ['/app/evolucoes', 'Evoluções', FileText]] },
-  { label: 'GESTÃO', items: [['/app/financeiro', 'Financeiro', Wallet], ['/app/convenios', 'Convênios', CreditCard], ['/app/comunicacao', 'Comunicação', Mail], ['/app/relatorios', 'Relatórios', Activity], ['/app/auditoria', 'Auditoria', Shield], ['/app/usuarios', 'Usuários', UserCog]] },
+  { label: 'OPERAÇÃO CLÍNICA', items: [['/app/agenda', 'Agenda', CalendarDays], ['/app/pacientes', 'Pacientes', Users], ['/app/profissionais', 'Profissionais', Stethoscope]] },
+  { label: 'GESTÃO', items: [['/app/usuarios', 'Usuários', UserCog]] },
   { label: 'SISTEMA', items: [['/app/configuracoes', 'Configurações', Settings]] },
 ]
 const professionalNav = [
@@ -202,7 +202,7 @@ function PageHeading({ title, path, tenantName, notify, openModal }: { title: st
   else if (path === '/app/pacientes') action = <button className="button button-primary" onClick={() => openModal({ title: 'Cadastrar paciente', content: 'Preencha os dados do paciente para iniciar o acompanhamento na clínica.' })}><Plus />Novo paciente</button>
   else if (path === '/app/profissionais') action = <button className="button button-primary" onClick={() => openModal({ title: 'Cadastrar profissional', content: 'Preencha os dados profissionais para adicionar à equipe do Instituto Vitta.', kind: 'professional' })}><Plus />Novo profissional</button>
   else if (path === '/admin/empresas') action = <button className="button button-primary" onClick={() => openModal({ title: 'Cadastrar parceiro', content: 'Configure a nova empresa parceira no Brothers Care.', kind: 'partner' })}><Plus />Novo parceiro</button>
-  return <div className="page-heading"><div><div className="eyebrow">{path.startsWith('/admin') ? 'PAINEL SAAS · BROTHERS DIGITAL' : path.includes('minha') || path.includes('meu') ? 'ÁREA PROFISSIONAL · INSTITUTO VITTA' : 'INSTITUTO VITTA · RIO DE JANEIRO'}</div><h1>{title}</h1><p>{subtitle}</p></div>{action}</div>
+  return <div className="page-heading"><div><div className="eyebrow">{path.startsWith('/admin') ? 'PAINEL SAAS · BROTHERS DIGITAL' : path.includes('minha') || path.includes('meu') ? `ÁREA PROFISSIONAL · ${tenantName}` : `OPERAÇÃO CLÍNICA · ${tenantName}`}</div><h1>{title}</h1><p>{subtitle}</p></div>{action}</div>
 }
 
 function PageSkeleton() { return <div className="skeleton-grid" aria-label="Carregando conteúdo"><div className="skeleton-row"><i/><i/><i/><i/></div><div className="skeleton-main"><i/><i/></div><div className="skeleton-row"><i/><i/></div></div> }

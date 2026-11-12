@@ -4,6 +4,7 @@ export type OnboardingContext = {
   email: string
   cnpj: string
   companyName?: string
+  requiresExistingPassword: boolean
   expiresAt?: string
 }
 
@@ -44,6 +45,7 @@ export type OnboardingCompletion = OnboardingFormData & { token: string; cnpj: s
 export type OnboardingCompletionResult = {
   status: 'completed'
   nextAction: 'login'
+  tenantId: string
 }
 
 export interface OnboardingApi {

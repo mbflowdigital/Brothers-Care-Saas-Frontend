@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { ArrowLeft, ArrowRight, Building2, HeartPulse, LoaderCircle, LockKeyhole, MapPin, RefreshCw, ShieldCheck, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { login } from '../../identity/accountActionApi'
+import { login, selectActiveTenant } from '../../identity/accountActionApi'
 import { toUiSession, type AuthenticatedUiSession } from '../../identity/LoginPage'
 import { onboardingApi } from '../api/onboardingApi'
 import { AdministratorStep } from '../components/AdministratorStep'
@@ -52,7 +52,7 @@ export function ClinicOnboardingPage({ hasPlatformAdministratorSession, onAuthen
   const [errors, setErrors] = useState<FieldErrors<AdministratorData> | FieldErrors<CompanyData> | FieldErrors<ClinicUnitData>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  const [completed, setCompleted] = useState(false)
+  const [completedTenantId, setCompletedTenantId] = useState('')
   const [enteringClinic, setEnteringClinic] = useState(false)
   const [entryError, setEntryError] = useState('')
 
@@ -60,7 +60,11 @@ export function ClinicOnboardingPage({ hasPlatformAdministratorSession, onAuthen
     setEntryError('')
     setEnteringClinic(true)
     try {
-      const session = toUiSession(await login(administrator.cpf, administrator.password))
+      const authenticated = await login(administrator.cpf, administrator.password)
+      const selected = authenticated.activeTenant?.id === completedTenantId
+        ? authenticated
+        : await selectActiveTenant(completedTenantId)
+      const session = toUiSession(selected)
       onAuthenticated(session)
       const role = session.memberships.find((membership) => membership.tenantId === session.tenantId)?.role
       navigate(role === 'Professional' ? '/app/minha-agenda' : role === 'Receptionist' ? '/app/agenda' : '/app/dashboard', { replace: true })
@@ -102,7 +106,7 @@ export function ClinicOnboardingPage({ hasPlatformAdministratorSession, onAuthen
   }
 
   const validateCurrent = () => {
-    const nextErrors = step === 0 ? validateAdministrator(administrator) : step === 1 ? validateCompany(company) : validateClinicUnit(clinicUnit)
+    const nextErrors = step === 0 ? validateAdministrator(administrator, context?.requiresExistingPassword) : step === 1 ? validateCompany(company) : validateClinicUnit(clinicUnit)
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) window.requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus())
     return Object.keys(nextErrors).length === 0
@@ -126,7 +130,7 @@ export function ClinicOnboardingPage({ hasPlatformAdministratorSession, onAuthen
     setSubmitError('')
     if (!context) return
 
-    const validations = [validateAdministrator(administrator), validateCompany(company), validateClinicUnit(clinicUnit)]
+    const validations = [validateAdministrator(administrator, context.requiresExistingPassword), validateCompany(company), validateClinicUnit(clinicUnit)]
     const invalidStep = validations.findIndex((validation) => Object.keys(validation).length > 0)
     if (invalidStep >= 0) {
       setReviewing(false)
@@ -138,8 +142,8 @@ export function ClinicOnboardingPage({ hasPlatformAdministratorSession, onAuthen
     setSubmitting(true)
     const data: OnboardingFormData = { administrator, company, clinicUnit }
     try {
-      await onboardingApi.complete({ token: tokenRef.current, cnpj: context.cnpj, ...data })
-      setCompleted(true)
+      const result = await onboardingApi.complete({ token: tokenRef.current, cnpj: context.cnpj, ...data })
+      setCompletedTenantId(result.tenantId)
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Não foi possível concluir o cadastro. Tente novamente.')
     } finally {
@@ -155,14 +159,14 @@ export function ClinicOnboardingPage({ hasPlatformAdministratorSession, onAuthen
     }
     return <OnboardingFrame><section className="onboarding-result"><span className="onboarding-result-icon error"><LockKeyhole /></span><h1>{copy.title}</h1><p>{copy.description}</p><div className="onboarding-result-actions">{invitationState === 'unavailable' && <button className="button button-dark" onClick={() => void loadContext(cnpj)}><RefreshCw />Tentar novamente</button>}<Link className="button button-outline" to="/login">Ir para o login</Link></div></section></OnboardingFrame>
   }
-  if (completed) return <OnboardingFrame><OnboardingSuccessPage hasPlatformAdministratorSession={hasPlatformAdministratorSession} enteringClinic={enteringClinic} error={entryError} onEnterClinic={() => void enterClinic()} onFinish={finishOnboarding} /></OnboardingFrame>
+  if (completedTenantId) return <OnboardingFrame><OnboardingSuccessPage hasPlatformAdministratorSession={hasPlatformAdministratorSession} enteringClinic={enteringClinic} error={entryError} onEnterClinic={() => void enterClinic()} onFinish={finishOnboarding} /></OnboardingFrame>
 
   return <OnboardingFrame>
     <OnboardingProgress current={reviewing ? 3 : step} />
     <section className="onboarding-card">
       <header className="onboarding-card-head"><div><div className="eyebrow">{reviewing ? 'Revisão final' : `Etapa ${step + 1} de 3`}</div><h1>{reviewing ? 'Confira os dados da clínica' : step === 0 ? 'Vamos criar seu acesso' : step === 1 ? 'Conte sobre a empresa' : 'Configure a primeira unidade'}</h1><p>{reviewing ? 'Revise as informações antes de concluir o cadastro.' : step === 0 ? 'Seus dados serão usados para administrar a clínica com segurança.' : step === 1 ? 'Complete os dados que identificam a empresa.' : 'Esta será a unidade padrão para iniciar a operação.'}</p></div>{!reviewing && <span className="onboarding-head-icon">{step === 0 ? <UserRound /> : step === 1 ? <Building2 /> : <MapPin />}</span>}</header>
       <div className="onboarding-card-body">
-        {!reviewing && step === 0 && <AdministratorStep value={administrator} email={context.email} errors={errors as FieldErrors<AdministratorData>} onChange={setAdministrator} />}
+        {!reviewing && step === 0 && <AdministratorStep value={administrator} email={context.email} requiresExistingPassword={context.requiresExistingPassword} errors={errors as FieldErrors<AdministratorData>} onChange={setAdministrator} />}
         {!reviewing && step === 1 && <CompanyStep value={company} cnpj={context.cnpj} errors={errors as FieldErrors<CompanyData>} onChange={setCompany} />}
         {!reviewing && step === 2 && <ClinicUnitStep value={clinicUnit} errors={errors as FieldErrors<ClinicUnitData>} onChange={setClinicUnit} />}
         {reviewing && <Review context={context} data={{ administrator, company, clinicUnit }} onEdit={(nextStep) => { setReviewing(false); setStep(nextStep); setErrors({}) }} />}

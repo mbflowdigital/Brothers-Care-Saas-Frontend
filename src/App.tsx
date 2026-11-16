@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { Activity, AlertCircle, ArrowDownLeft, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, Clock3, Command, FileClock, FileText, Filter, HeartPulse, Home, LayoutDashboard, Menu, MessageCircle, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Shield, Sparkles, Stethoscope, UserCog, UserRound, Users, Wallet, X } from 'lucide-react'
+import { Activity, AlertCircle, ArrowDownLeft, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, Command, FileClock, FileText, Filter, HeartPulse, Home, LayoutDashboard, Menu, MessageCircle, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Shield, Sparkles, Stethoscope, UserCog, UserRound, Users, Wallet, X } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { appointments, evolutions, monthlyAppointments, patients, professionals } from './data'
+import { monthlyAppointments, patients, professionals } from './data'
 import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PlansPage, ReportsPage, SettingsPage } from './ExtraViews'
 import { AccountActionPage } from './features/identity/AccountActionPage'
 import { AccountMenu } from './features/identity/AccountMenu'
@@ -14,6 +14,8 @@ import { ClinicOnboardingPage } from './features/onboarding/pages/ClinicOnboardi
 import { PatientForm } from './features/patients/PatientForm'
 import { deactivatePatient, listPatients, type PatientListItem } from './features/patients/patientApi'
 import { ProfessionalsManagementPage } from './features/professionals/ProfessionalsManagementPage'
+import { AppointmentAgendaPage } from './features/scheduling/AppointmentAgendaPage'
+import { CreateAppointmentForm } from './features/scheduling/CreateAppointmentForm'
 import { TeamPage, WelcomeTeamCard } from './features/team/TeamPage'
 import { ClinicGettingStarted, getWorkspaceSummary, type WorkspaceSummary } from './features/workspace/ClinicGettingStarted'
 
@@ -24,7 +26,7 @@ const sessionDestination = (session: Session) => {
   const role = session.memberships.find((item) => item.tenantId === session.tenantId)?.role
   return role === 'Professional' ? '/app/minha-agenda' : role === 'Receptionist' ? '/app/agenda' : '/app/dashboard'
 }
-type ModalRequest = { title: string; content: string; kind?: 'patient' }
+type ModalRequest = { title: string; content: string; kind?: 'patient' | 'appointment' }
 type OpenModal = (modal: ModalRequest | null) => void
 const clinicPath = '/app/dashboard'
 const routeLabels: Record<string, string> = {
@@ -49,6 +51,7 @@ export default function App() {
   const [sessionLoading, setSessionLoading] = useState(true)
   const [toast, setToast] = useState('')
   const [modal, setModal] = useState<ModalRequest | null>(null)
+  const [appointmentsRevision, setAppointmentsRevision] = useState(0)
   const [commandOpen, setCommandOpen] = useState(false)
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2800) }
   const signIn = (value: Session) => setSession(value)
@@ -85,12 +88,16 @@ export default function App() {
       <Route path="/recuperar-senha" element={<AccountActionPage mode="recovery" />} />
       <Route path="/onboarding" element={<ClinicOnboardingPage hasPlatformAdministratorSession={session?.profile === 'admin'} onAuthenticated={signIn} />} />
       <Route path="/vitta" element={<VittaPage onAction={() => notify('Nossa equipe entrará em contato em breve.')} />} />
-      <Route path="/admin/*" element={session?.profile === 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/login" replace />} />
-      <Route path="/app/*" element={session && session.profile !== 'admin' ? session.tenantId ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} /> : <Navigate to="/selecionar-empresa" replace /> : <Navigate to="/login" replace />} />
+      <Route path="/admin/*" element={session?.profile === 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} appointmentsRevision={appointmentsRevision} /> : <Navigate to="/login" replace />} />
+      <Route path="/app/*" element={session && session.profile !== 'admin' ? session.tenantId ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} appointmentsRevision={appointmentsRevision} /> : <Navigate to="/selecionar-empresa" replace /> : <Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     {commandOpen && <CommandPalette onClose={() => setCommandOpen(false)} />}
-    {modal && <Modal title={modal.title} onClose={() => setModal(null)}>{modal.kind === 'patient' ? <PatientForm onDone={(patient) => { setModal(null); window.dispatchEvent(new Event('patients:changed')); notify(`${patient.fullName} foi cadastrado com sucesso.`) }} /> : <><p className="modal-copy">{modal.content}</p><div className="modal-foot"><button className="button button-outline" onClick={() => setModal(null)}>Fechar</button><button className="button button-primary" onClick={() => { setModal(null); notify('Alterações salvas com sucesso.') }}>Confirmar</button></div></>}</Modal>}
+    {modal && <Modal title={modal.title} onClose={() => setModal(null)}>{modal.kind === 'patient'
+      ? <PatientForm onDone={(patient) => { setModal(null); window.dispatchEvent(new Event('patients:changed')); notify(`${patient.fullName} foi cadastrado com sucesso.`) }} />
+      : modal.kind === 'appointment'
+        ? <CreateAppointmentForm onCreated={() => { setModal(null); setAppointmentsRevision((revision) => revision + 1); notify('Agendamento criado com sucesso.') }} />
+        : <><p className="modal-copy">{modal.content}</p><div className="modal-foot"><button className="button button-outline" onClick={() => setModal(null)}>Fechar</button><button className="button button-primary" onClick={() => { setModal(null); notify('Alterações salvas com sucesso.') }}>Confirmar</button></div></>}</Modal>}
     {toast && <div className="toast"><CheckCircle2 />{toast}</div>}
   </>
 }
@@ -139,7 +146,7 @@ function VittaPage({ onAction }: { onAction: () => void }) {
   return <main className="public-page"><header className="public-nav"><Link className="public-brand" to="/vitta"><span className="tenant-logo" style={{width:34,height:34}}>IV</span><span>Instituto Vitta</span></Link><nav className="public-links"><a href="#especialidades">Especialidades</a><a href="#sobre-vitta">A clínica</a><a href="#contato-vitta">Contato</a></nav><button className="button button-primary" onClick={onAction}>Solicitar atendimento <ArrowRight /></button></header><section className="vitta-hero"><div className="eyebrow" style={{color:'#66ddc3'}}>INSTITUTO VITTA REABILITAÇÃO</div><h1>Seu caminho para mais autonomia começa com cuidado.</h1><p>Uma equipe multidisciplinar, atenta à sua história e comprometida com cada conquista, na clínica ou em casa.</p><button className="button button-primary" onClick={onAction}>Solicitar atendimento <ArrowRight /></button></section><section className="public-section" id="sobre-vitta"><div className="section-intro"><div className="eyebrow">Cuidado que acompanha você</div><h2>Um jeito integrado de reabilitar</h2><p>Na Vitta, cada plano é construído junto com você, com escuta, conhecimento e acompanhamento próximo.</p></div><div className="vitta-service-grid" id="especialidades">{services.map(([Icon,title,description])=><article className="feature-card" key={title}><div className="feature-icon"><Icon /></div><h3>{title}</h3><p>{description}</p></article>)}</div></section><section className="public-section" id="contato-vitta"><div className="final-cta"><div><h2>Vamos conversar sobre o seu cuidado?</h2><p>Atendimento em clínica e domiciliar no Rio de Janeiro.</p></div><button className="button button-dark" onClick={onAction}>Solicitar atendimento <ArrowRight /></button></div></section><footer className="public-footer"><Link to="/vitta" className="public-brand"><span className="tenant-logo" style={{width:30,height:30}}>IV</span>Instituto Vitta</Link><span>Rio de Janeiro · Cuidado multidisciplinar</span><Link to="/">Uma plataforma Brothers Digital</Link></footer></main>
 }
 
-function Workspace({ session, onLogout, notify, openModal }: { session: Session; onLogout: () => void; notify: (text: string) => void; openModal: OpenModal }) {
+function Workspace({ session, onLogout, notify, openModal, appointmentsRevision }: { session: Session; onLogout: () => void; notify: (text: string) => void; openModal: OpenModal; appointmentsRevision: number }) {
   const location = useLocation()
   const navigate = useNavigate()
   const isAdmin = session.profile === 'admin'
@@ -166,13 +173,13 @@ function Workspace({ session, onLogout, notify, openModal }: { session: Session;
   return <div className="app-shell">
     <aside className={`sidebar ${collapsed?'collapsed':''} ${mobileOpen?'mobile-open':''}`}><Link to={isAdmin?'/admin':clinicPath} className="brand"><span className="brand-mark"><HeartPulse size={18}/></span>{!collapsed&&<span className="brand-text">brothers care</span>}</Link>{!isAdmin&&<button className="tenant-switch" onClick={()=>notify(tenantName)}><span className="tenant-logo">{tenantInitials}</span>{!collapsed&&<><span className="tenant-copy"><strong>{tenantName}</strong><small>{isProfessional?'Seu espaço profissional':'Clínica ativa'}</small></span><ChevronDown size={13}/></>}</button>}{navGroups.map((group)=><div key={group.label}><div className="nav-label">{!collapsed&&group.label}</div><nav className="side-nav">{group.items.map(([href,label,Icon])=><Link key={String(href)} to={href as string} onClick={()=>setMobileOpen(false)} className={`nav-link ${path===href?'active':''}`} title={collapsed?label as string:undefined}>{menuIcon(Icon as typeof LayoutDashboard)}{!collapsed&&<span>{label as string}</span>}</Link>)}</nav></div>)}<div className="side-bottom"><button className="collapse-btn" onClick={()=>setCollapsed(!collapsed)}><PanelLeftClose size={15}/>{!collapsed&&<span>Recolher menu</span>}</button></div></aside>
     <div className="main-area"><header className="topbar"><div style={{display:'flex',alignItems:'center',gap:10}}><button className="icon-button mobile-menu" onClick={()=>setMobileOpen(!mobileOpen)} aria-label="Abrir menu"><Menu /></button><div className="breadcrumbs"><span>{isAdmin?'Brothers Care':tenantName}</span><ChevronRight size={12}/><strong>{title}</strong></div></div><div className="top-actions"><button className="icon-button" onClick={()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true}))} aria-label="Buscar"><Search/></button><button className="icon-button command-trigger" onClick={()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true}))} title="Busca rápida"><Command/></button><button className="icon-button" onClick={()=>notify('Você está em dia. Não há novas notificações.')} aria-label="Notificações"><Bell/><i className="notification-dot"/></button><span className="top-divider"/><AccountMenu name={session.name} email={session.username} role={isAdmin?'Super Admin':isProfessional?'Profissional':'Administradora'} onLogout={onLogout} onPasswordChanged={onLogout} /></div></header>
-      <main className="content"><PageHeading title={title} path={path} tenantName={tenantName} notify={notify} openModal={openModal} />{loading?<PageSkeleton/>:isAdmin?<AdminContent path={path} query={query} setQuery={setQuery} notify={notify} />:<ClinicContent path={path} session={session} activeTab={activeTab} setActiveTab={setActiveTab} query={query} setQuery={setQuery} notify={notify} openModal={openModal} />}</main>
+      <main className="content"><PageHeading title={title} path={path} tenantName={tenantName} notify={notify} openModal={openModal} professional={session.profile === 'professional'} />{loading?<PageSkeleton/>:isAdmin?<AdminContent path={path} query={query} setQuery={setQuery} notify={notify} />:<ClinicContent path={path} session={session} activeTab={activeTab} setActiveTab={setActiveTab} query={query} setQuery={setQuery} notify={notify} appointmentsRevision={appointmentsRevision} />}</main>
     </div>
     {!isAdmin&&<nav className="mobile-bottom">{mobileLinks.map(([href,label,Icon])=><Link key={String(href)} to={href as string} className={path===href?'active':''}>{menuIcon(Icon as typeof LayoutDashboard)}<span>{label as string}</span></Link>)}</nav>}
   </div>
 }
 
-function PageHeading({ title, path, tenantName, notify, openModal }: { title: string; path: string; tenantName: string; notify: (text: string) => void; openModal: OpenModal }) {
+function PageHeading({ title, path, tenantName, notify, openModal, professional }: { title: string; path: string; tenantName: string; notify: (text: string) => void; openModal: OpenModal; professional: boolean }) {
   const isDashboard = path === clinicPath || path === '/admin'
   const isAgenda = path.includes('agenda')
   const isEvolution = path.includes('evolu')
@@ -180,7 +187,9 @@ function PageHeading({ title, path, tenantName, notify, openModal }: { title: st
   const subtitle = path === '/admin/pre-cadastros' ? 'Acompanhe convites e cadastros pendentes das clínicas.' : isDashboard ? path === '/admin' ? 'Acompanhe a saúde de toda a operação Brothers Care.' : `Uma visão clara da operação de ${tenantName}.` : isAgenda ? 'Organize atendimentos, equipe e rotina em um só lugar.' : isEvolution ? 'Registros clínicos organizados para acompanhar cada conquista.' : isPatientProfile ? 'Histórico e informações do cuidado em um só lugar.' : `Gerencie ${title.toLocaleLowerCase('pt-BR')} de ${tenantName}.`
   let action: ReactNode = <button className="button button-outline" onClick={() => notify('Relatório preparado para exportação.')}><ArrowDownLeft />Exportar</button>
   if (path === '/admin' || path === '/admin/pre-cadastros') action = null
-  else if (isDashboard || isAgenda) action = <button className="button button-primary" onClick={() => openModal({ title: 'Novo atendimento', content: 'Selecione paciente, profissional, modalidade e horário para adicionar um atendimento à agenda.' })}><Plus />Novo atendimento</button>
+  else if (path === '/app/minha-agenda' && professional) action = <button className="button button-primary" onClick={() => openModal({ title: 'Novo agendamento', content: '', kind: 'appointment' })}><Plus />Novo agendamento</button>
+  else if (isAgenda) action = null
+  else if (isDashboard) action = <button className="button button-primary" onClick={() => openModal({ title: 'Novo atendimento', content: 'Selecione paciente, profissional, modalidade e horário para adicionar um atendimento à agenda.' })}><Plus />Novo atendimento</button>
   else if (isEvolution) action = <button className="button button-primary" onClick={() => document.getElementById('evolution-patient')?.focus()}><Plus />Nova evolução</button>
   else if (path === '/app/pacientes') action = <button className="button button-primary" onClick={() => openModal({ title: 'Cadastrar paciente', content: 'Preencha os dados do paciente para iniciar o acompanhamento na clínica.', kind: 'patient' })}><Plus />Novo paciente</button>
   else if (path === '/app/profissionais') action = <button className="button button-primary" onClick={() => window.dispatchEvent(new Event('professionals:create'))}><Plus />Novo profissional</button>
@@ -191,10 +200,18 @@ function PageSkeleton() { return <div className="skeleton-grid" aria-label="Carr
 
 function Kpi({ label, value, note, icon: Icon, tone = 'teal' }: { label: string; value: string; note?: ReactNode; icon: typeof Users; tone?: string }) { return <article className="card kpi-card"><div className="kpi-top"><span>{label}</span><span className="kpi-icon" style={tone==='coral'?{background:'#fff0eb',color:'#c76a56'}:tone==='blue'?{background:'#edf3fb',color:'#6686b1'}:undefined}><Icon/></span></div><div className="kpi-value">{value}</div>{note&&<div className="kpi-note">{note}</div>}</article> }
 
-function ClinicContent({ path, session, activeTab, setActiveTab, query, setQuery, notify, openModal }: { path: string; session: Session; activeTab: string; setActiveTab: (tab: string) => void; query: string; setQuery: (query: string) => void; notify: (text: string) => void; openModal: OpenModal }) {
+function ClinicContent({ path, session, activeTab, setActiveTab, query, setQuery, notify, appointmentsRevision }: { path: string; session: Session; activeTab: string; setActiveTab: (tab: string) => void; query: string; setQuery: (query: string) => void; notify: (text: string) => void; appointmentsRevision: number }) {
   if (path===clinicPath) return <><WelcomeTeamCard tenantName={session.tenantName}/><ClinicDashboard notify={notify}/></>
-  if (path==='/app/minha-agenda') return <ProfessionalDashboard notify={notify}/>
-  if (path==='/app/agenda'||path==='/app/meus-atendimentos') return <AgendaPage professional={session.profile==='professional'} notify={notify} openModal={openModal}/>
+  if (path==='/app/minha-agenda') return <AppointmentAgendaPage viewerRole="professional" appointmentsRevision={appointmentsRevision}/>
+  if (path==='/app/agenda'||path==='/app/meus-atendimentos') {
+    const membershipRole = session.memberships.find((item) => item.tenantId === session.tenantId)?.role
+    const viewerRole = session.profile === 'professional'
+      ? 'professional'
+      : membershipRole === 'ClinicAdministrator'
+        ? 'clinicAdministrator'
+        : 'unsupported'
+    return <AppointmentAgendaPage viewerRole={viewerRole} appointmentsRevision={appointmentsRevision}/>
+  }
   if (path==='/app/pacientes'||path==='/app/meus-pacientes') return <RealPatientsPage query={query} setQuery={setQuery} professional={session.profile==='professional'}/>
   if (path.startsWith('/app/pacientes/')) return <PatientDetail activeTab={activeTab} setActiveTab={setActiveTab} />
   if (path==='/app/profissionais') return <ProfessionalsManagementPage query={query} setQuery={setQuery}/>
@@ -223,9 +240,16 @@ function ClinicDashboard({ notify }: { notify: (text: string) => void }) {
 
 function ActivityCard() { const activity=[['evolução finalizada','Ana Souza finalizou evolução de Regina Oliveira','Há 12 min'],['novo paciente','Helena Costa foi cadastrada pela recepção','Há 38 min'],['atendimento realizado','Juliana Mendes concluiu sessão de José Almeida','Há 1 h']];return <div className="card activity-card"><div className="card-heading"><div><h2>Atividade recente</h2><p>Atualizações da equipe</p></div></div><div className="activity-list">{activity.map(([title,copy,time],index)=><div className="activity-item" key={title}><span className="activity-icon">{index===0?<FileText/>:index===1?<UserRound/>:<CheckCircle2/>}</span><div className="activity-copy"><strong>{title}</strong><br/>{copy}<small>{time}</small></div></div>)}</div></div> }
 
-function AppointmentList({ compact = false, professional = false, onSelect }: { compact?: boolean; professional?: boolean; onSelect?: (patient: string) => void }) { const items=professional?appointments.filter((item)=>item.professional==='Ana Souza'):appointments;return <div className="appointment-list">{items.slice(0,compact?5:items.length).map((item,index)=><button className="appointment-item" key={`${item.time}-${item.patient}`} style={{width:'100%',textAlign:'left',background:'transparent',border:0}} onClick={()=>onSelect?.(item.patient)}><span className="appointment-time">{item.time}</span><span className="avatar small" style={{background:['#d9eee5','#f6e7d8','#e0e9f5','#eee2f0'][index%4]}}>{item.patient.split(' ').map((part)=>part[0]).slice(0,2).join('')}</span><span className="appointment-copy"><strong>{item.patient}</strong><small>{professional?'Terapia Ocupacional':`${item.professional} · ${item.type}`}</small></span><span className={`status status-${item.status.toLowerCase()}`}>{item.status}</span></button>)}</div> }
-
-function ProfessionalDashboard({ notify }: { notify: (text: string) => void }) { return <><div className="grid kpi-grid" style={{gridTemplateColumns:'repeat(4,minmax(0,1fr))'}}><Kpi label="Atendimentos hoje" value="6" note="Sua agenda de quarta-feira" icon={CalendarDays}/><Kpi label="Concluídos" value="3" note="50% da agenda concluída" icon={CheckCircle2}/><Kpi label="Próximo atendimento" value="14:30" note="Antônio Nogueira · Clínica" icon={Clock3} tone="blue"/><Kpi label="Pendências" value="2" note="Evoluções para finalizar" icon={FileText} tone="coral"/></div><div className="grid dashboard-grid"><div className="card appointments-card"><div className="card-heading"><div><h2>Minha agenda de hoje</h2><p>Quarta-feira, 15 de outubro</p></div><button className="button button-outline" onClick={()=>notify('Visualização semanal aberta.')}><CalendarDays/>Semana</button></div><AppointmentList professional onSelect={(patient)=>notify(`Atendimento de ${patient} selecionado.`)}/></div><div className="side-stack"><div className="card activity-card"><div className="card-heading"><div><h2>Minhas pendências</h2><p>2 evoluções aguardando finalização</p></div></div><div className="activity-list">{evolutions.slice(6,8).map((item)=><div className="activity-item" key={item.id}><span className="activity-icon"><FileText/></span><div className="activity-copy"><strong>{item.patient}</strong><br/>Atendimento de terapia ocupacional<small>Hoje · 10:30</small></div></div>)}</div><Link className="link-button" to="/app/minhas-evolucoes">Ver evoluções <ArrowRight size={12}/></Link></div><div className="card distribution"><div className="card-heading"><div><h2>Seus pacientes</h2><p>Acompanhamento ativo</p></div></div><div className="kpi-value" style={{fontSize:26}}>12</div><div className="kpi-note">4 atendimentos nesta semana</div><Link className="link-button" to="/app/meus-pacientes" style={{display:'inline-block',marginTop:12}}>Ver pacientes <ArrowRight size={12}/></Link></div></div></div></> }
+function AppointmentList({ compact = false }: {
+  compact?: boolean
+  professional?: boolean
+  onSelect?: (patient: string) => void
+}) {
+  return <div className={`empty-state ${compact ? 'appointment-empty' : ''}`}>
+    <p>Consulte a agenda para visualizar os horários carregados da empresa.</p>
+    <Link className="link-button" to="/app/agenda">Ver agenda</Link>
+  </div>
+}
 
 function TableToolbar({ query, setQuery, placeholder, children }: { query: string; setQuery: (value:string)=>void; placeholder:string; children?:React.ReactNode }) { return <div className="table-toolbar"><label className="searchbox"><Search/><input placeholder={placeholder} value={query} onChange={(event)=>setQuery(event.target.value)}/></label><div className="filter-actions">{children}<button className="button button-outline"><Filter/>Filtros</button></div></div> }
 
@@ -282,8 +306,6 @@ function ProfessionalsPage({ query, setQuery }: { query:string; setQuery:(value:
 export { ProfessionalsPage as LegacyProfessionalsPage }
 
 function Pagination() { return <div className="pagination"><button aria-label="Página anterior"><ChevronLeft size={13}/></button><button className="active">1</button><button>2</button><button>3</button><button aria-label="Próxima página"><ChevronRight size={13}/></button></div> }
-
-function AgendaPage({ professional, notify, openModal }: { professional:boolean; notify:(text:string)=>void; openModal:(modal:{title:string;content:string}|null)=>void }) { const [view,setView]=useState('Semana');const [filter,setFilter]=useState('Todos os profissionais');return <><div className="card" style={{padding:'14px 17px',marginBottom:14,display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}><div style={{display:'flex',alignItems:'center',gap:8}}><button className="icon-button" onClick={()=>notify('Período anterior')}><ChevronLeft/></button><strong style={{fontSize:12,color:'#263f4d'}}>13 — 19 de outubro, 2026</strong><button className="icon-button" onClick={()=>notify('Próximo período')}><ChevronRight/></button><button className="button button-outline" onClick={()=>notify('Hoje selecionado')}>Hoje</button></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{!professional&&<select className="select-mini" value={filter} onChange={(event)=>setFilter(event.target.value)}><option>Todos os profissionais</option><option>Ana Souza</option><option>Juliana Mendes</option></select>}<select className="select-mini"><option>Todas as especialidades</option><option>Terapia Ocupacional</option><option>Fisioterapia</option></select><div className="tabs" style={{margin:0,gap:10}}>{['Dia','Semana','Mês','Lista'].map((item)=><button className={`tab ${view===item?'active':''}`} key={item} onClick={()=>setView(item)}>{item}</button>)}</div></div></div>{view==='Lista'?<section className="card appointments-card"><AppointmentList professional={professional} onSelect={(patient)=>openModal({title:`Atendimento · ${patient}`,content:'Paciente, profissional, horário e status do atendimento. Confirme presença, registre evolução ou reagende este horário.'})}/></section>:<div className="card table-card"><div className="table-wrap"><table className="calendar-table"><thead><tr><th>Horário</th>{['Seg 13','Ter 14','Qua 15','Qui 16','Sex 17'].map((day)=><th key={day}>{day}</th>)}</tr></thead><tbody>{['08:00','09:00','10:00','11:00','14:00','15:00','16:00'].map((time,row)=><tr key={time}><td style={{color:'#8c9b9e',fontSize:9}}>{time}</td>{[0,1,2,3,4].map((day)=><td key={`${time}-${day}`} style={{minWidth:135,height:58,whiteSpace:'normal'}}>{((row+day)%3===0||row===4&&day===2)&&<button className="calendar-event" onClick={()=>openModal({title:`Atendimento · ${appointments[(row+day)%appointments.length].patient}`,content:`${time} · ${appointments[(row+day)%appointments.length].professional} · ${appointments[(row+day)%appointments.length].type}. Status: ${appointments[(row+day)%appointments.length].status}.`})}><strong>{appointments[(row+day)%appointments.length].patient}</strong><small>{appointments[(row+day)%appointments.length].professional} · ${time}</small></button>}</td>)}</tr>)}</tbody></table></div></div>}</> }
 
 function PatientDetail({ activeTab, setActiveTab }: { activeTab:string; setActiveTab:(tab:string)=>void }) {
   const patientId = Number(window.location.pathname.split('/').pop()) || 1

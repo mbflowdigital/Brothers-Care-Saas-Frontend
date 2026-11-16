@@ -6,6 +6,7 @@ export type TeamUnit = { id: string; name: string }
 export type TeamMember = { membershipId: string; userId: string; displayName: string; email: string; role: TeamRole; status: TeamStatus; createdAt: string; units: TeamUnit[]; isCurrentUser: boolean; performsCare: boolean; specialty?: string; councilType?: string; registrationNumber?: string; councilState?: string; defaultAppointmentDurationMinutes?: number }
 export type ClinicUnit = { id: string; name: string; isActive: boolean }
 export type InviteTeamMember = { displayName: string; email: string; role: TeamRole; clinicUnitIds: string[]; performsCare: boolean; specialty: string; councilType: string; registrationNumber: string; councilState: string; defaultAppointmentDurationMinutes?: number }
+export type InvitationResult = { deliveryStatus: 'sent' | 'manual-required'; activationUrl?: string; expiresAt?: string }
 
 async function problem(response: Response, fallback: string): Promise<never> {
   const body = await response.json().catch(() => null) as { title?: string } | null
@@ -36,6 +37,7 @@ export async function listClinicUnits() {
 export async function inviteTeamMember(input: InviteTeamMember) {
   const response = await fetch(`${apiBaseUrl}/invitations`, { method: 'POST', credentials: 'include', headers: await secureHeaders(), body: JSON.stringify(input) })
   if (!response.ok) return problem(response, 'Não foi possível enviar o convite.')
+  return response.json() as Promise<InvitationResult>
 }
 
 export async function updateTeamMember(membershipId: string, input: Pick<InviteTeamMember, 'role' | 'clinicUnitIds' | 'performsCare' | 'specialty' | 'councilType' | 'registrationNumber' | 'councilState' | 'defaultAppointmentDurationMinutes'>) {

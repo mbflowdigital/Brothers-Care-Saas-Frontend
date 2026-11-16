@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, BriefcaseMedical, Building2, Check, CheckCircle2, Copy, Edit3, Link2, Mail, MoreHorizontal, Plus, RotateCw, Search, ShieldCheck, Sparkles, UserRound, UserX, Users, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import { deactivateTeamMember, inviteTeamMember, listClinicUnits, listTeam, updateTeamMember, type ClinicUnit, type InvitationResult, type InviteTeamMember, type TeamMember, type TeamRole } from './teamApi'
 
 const roleCopy: Record<TeamRole, { label: string; description: string }> = {
@@ -38,6 +39,20 @@ export function TeamPage() {
   useEffect(() => { void load() }, [load])
   const filtered = useMemo(() => members.filter((member) => `${member.displayName} ${member.email} ${member.specialty ?? ''}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))), [members, query])
 
+  useEffect(() => {
+    if (!menu) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest('.team-actions, .team-action-menu-portal')) setMenu(null)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenu(null) }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [menu])
+
   function beginInvite(member?: TeamMember) { setEditing(null); setForm(member ? formFromMember(member) : { ...empty, clinicUnitIds: units.length === 1 ? [units[0].id] : [] }); setError(''); setMenu(null); setOpen(true) }
   function beginEdit(member: TeamMember) { setEditing(member); setForm(formFromMember(member)); setError(''); setMenu(null); setOpen(true) }
   async function submit(event: React.FormEvent) {
@@ -61,23 +76,120 @@ export function TeamPage() {
         <div className="team-role"><small>Acesso</small><strong>{roleCopy[member.role].label}</strong>{member.performsCare && <span className="care-badge"><BriefcaseMedical /> Também atende</span>}</div>
         <div className="team-units"><small>{member.performsCare ? 'Atuação e unidades' : 'Unidades'}</small><span>{member.performsCare && member.specialty ? `${member.specialty} · ` : ''}{member.units.map((unit) => unit.name).join(', ') || 'Nenhuma unidade'}</span></div>
         <span className={`status status-${member.status === 'Active' ? 'ativo' : member.status === 'Invited' ? 'atenção' : 'inativo'}`}>{statusCopy[member.status]}</span>
-        <div className="team-actions"><button onClick={() => setMenu(menu === member.membershipId ? null : member.membershipId)} aria-label={`Ações para ${member.displayName}`}><MoreHorizontal /></button>{menu === member.membershipId && <div className="team-action-menu">{(member.status === 'Active' || member.status === 'Invited') && <button onClick={() => beginEdit(member)}><Edit3 />Editar acesso e atuação</button>}{member.status === 'Invited' && <button onClick={() => void resend(member)}><RotateCw />Reenviar convite</button>}{member.status === 'Revoked' && <button onClick={() => beginInvite(member)}><RotateCw />Reativar por convite</button>}{member.status !== 'Revoked' && !member.isCurrentUser && <button className="danger" onClick={() => void deactivate(member)}><UserX />Desativar acesso</button>}</div>}</div>
+        <TeamActionMenu
+          member={member}
+          open={menu === member.membershipId}
+          onToggle={() => setMenu(menu === member.membershipId ? null : member.membershipId)}
+          onEdit={() => beginEdit(member)}
+          onResend={() => void resend(member)}
+          onReactivate={() => beginInvite(member)}
+          onDeactivate={() => void deactivate(member)}
+        />
       </article>)}</div>
       {!loading && filtered.length === 0 && <div className="empty-state"><Users /><h3>{query ? 'Nenhuma pessoa encontrada' : 'Sua equipe começa aqui'}</h3><p>{query ? 'Tente buscar por outro termo.' : 'Convide a primeira pessoa. Leva menos de um minuto.'}</p>{!query && <button className="button button-primary" onClick={() => beginInvite()}><Plus />Fazer primeiro convite</button>}</div>}{loading && <div className="empty-state"><p>Organizando sua equipe…</p></div>}
     </section>{open && <TeamMemberModal editing={editing} form={form} setForm={setForm} units={units} saving={saving} error={error} onClose={() => setOpen(false)} onSubmit={submit} />}{invitation && <InvitationResultModal email={invitation.email} result={invitation.result} onClose={() => setInvitation(null)} />}
   </div>
 }
 
+function TeamActionMenu({
+  member,
+  open,
+  onToggle,
+  onEdit,
+  onResend,
+  onReactivate,
+  onDeactivate,
+}: {
+  member: TeamMember
+  open: boolean
+  onToggle: () => void
+  onEdit: () => void
+  onResend: () => void
+  onReactivate: () => void
+  onDeactivate: () => void
+}) {
+  const trigger = useRef<HTMLButtonElement>(null)
+  const [position, setPosition] = useState({ top: 0, left: 0 })
+
+  useLayoutEffect(() => {
+    if (!open || !trigger.current) return
+
+    const actionCount = Number(member.status === 'Active' || member.status === 'Invited') +
+      Number(member.status === 'Invited') +
+      Number(member.status === 'Revoked') +
+      Number(member.status !== 'Revoked' && !member.isCurrentUser)
+    const menuHeight = Math.max(50, actionCount * 38 + 12)
+    const placeMenu = () => {
+      const rect = trigger.current?.getBoundingClientRect()
+      if (!rect) return
+      const width = 228
+      const left = Math.min(window.innerWidth - width - 12, Math.max(12, rect.right - width))
+      const top = window.innerHeight - rect.bottom >= menuHeight + 8
+        ? rect.bottom + 5
+        : Math.max(12, rect.top - menuHeight - 5)
+      setPosition({ top, left })
+    }
+
+    placeMenu()
+    window.addEventListener('resize', placeMenu)
+    window.addEventListener('scroll', placeMenu, true)
+    return () => {
+      window.removeEventListener('resize', placeMenu)
+      window.removeEventListener('scroll', placeMenu, true)
+    }
+  }, [member.isCurrentUser, member.status, open])
+
+  return <div className="team-actions">
+    <button
+      ref={trigger}
+      type="button"
+      aria-label={`Ações para ${member.displayName}`}
+      aria-haspopup="menu"
+      aria-expanded={open}
+      onClick={onToggle}
+    >
+      <MoreHorizontal />
+    </button>
+    {open && createPortal(<div className="team-action-menu team-action-menu-portal" style={position} role="menu" aria-label={`Ações para ${member.displayName}`}>
+      {(member.status === 'Active' || member.status === 'Invited') && <button type="button" role="menuitem" onClick={onEdit}><Edit3 />Editar acesso e atuação</button>}
+      {member.status === 'Invited' && <button type="button" role="menuitem" onClick={onResend}><RotateCw />Reenviar convite</button>}
+      {member.status === 'Revoked' && <button type="button" role="menuitem" onClick={onReactivate}><RotateCw />Reativar por convite</button>}
+      {member.status !== 'Revoked' && !member.isCurrentUser && <button type="button" role="menuitem" className="danger" onClick={onDeactivate}><UserX />Desativar acesso</button>}
+    </div>, document.body)}
+  </div>
+}
+
 export function InvitationResultModal({ email, result, onClose }: { email: string; result: InvitationResult; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState('')
   const copy = async () => {
     if (!result.activationUrl) return
-    await navigator.clipboard.writeText(result.activationUrl)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2200)
+    setCopyError('')
+    try {
+      await navigator.clipboard.writeText(result.activationUrl)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2200)
+    } catch {
+      setCopyError('Não foi possível copiar o link. Selecione e copie o endereço manualmente.')
+    }
   }
   const delivered = result.deliveryStatus === 'sent'
-  return <div className="modal-backdrop"><section className="modal invitation-result-modal" role="dialog" aria-modal="true" aria-labelledby="invitation-result-title"><button className="modal-close" onClick={onClose} aria-label="Fechar"><X /></button><span className={`invitation-result-icon ${delivered ? 'sent' : 'manual'}`}>{delivered ? <CheckCircle2 /> : <Link2 />}</span><h2 id="invitation-result-title">{delivered ? 'Convite enviado' : 'Convite criado com segurança'}</h2><p>{delivered ? <>Enviamos as instruções para <strong>{email}</strong>.</> : <>O e-mail não pôde ser entregue agora. O acesso foi criado e você pode compartilhar o link por WhatsApp ou outro canal seguro.</>}</p>{result.activationUrl && <div className="invitation-link-box"><div><Link2 /><span><small>Link de primeiro acesso</small><strong>{result.activationUrl}</strong></span></div><button type="button" className="button button-outline" onClick={() => void copy()}>{copied ? <Check /> : <Copy />}{copied ? 'Copiado' : 'Copiar link'}</button></div>}<div className="invitation-result-note"><Mail /><span>{delivered ? 'Se necessário, você também pode copiar o link e enviar por outro canal.' : 'O link é pessoal, temporário e deve ser enviado somente ao profissional convidado.'}</span></div><button type="button" className="button button-primary" onClick={onClose}>Concluir</button></section></div>
+  const hasManualLink = !delivered && Boolean(result.activationUrl)
+  return <div className="modal-backdrop"><section className="modal invitation-result-modal" role="dialog" aria-modal="true" aria-labelledby="invitation-result-title">
+    <button className="modal-close" onClick={onClose} aria-label="Fechar"><X /></button>
+    <span className={`invitation-result-icon ${delivered ? 'sent' : 'manual'}`}>{delivered ? <CheckCircle2 /> : <Link2 />}</span>
+    <h2 id="invitation-result-title">{delivered ? 'Convite enviado' : hasManualLink ? 'Convite criado; e-mail não entregue' : 'Convite criado; link indisponível'}</h2>
+    <p>{delivered
+      ? <>Enviamos as instruções para <strong>{email}</strong>.</>
+      : hasManualLink
+        ? <>O acesso foi criado, mas não conseguimos entregar o e-mail a <strong>{email}</strong>. Compartilhe o link abaixo por um canal seguro.</>
+        : <>O acesso foi criado, mas o e-mail não foi entregue e a URL de ativação não está configurada. Configure a URL antes de reenviar o convite.</>}
+    </p>
+    {result.activationUrl && <div className="invitation-link-box"><div><Link2 /><span><small>Link pessoal de primeiro acesso</small><strong>{result.activationUrl}</strong></span></div><button type="button" className="button button-outline" onClick={() => void copy()}>{copied ? <Check /> : <Copy />}{copied ? 'Copiado' : 'Copiar link'}</button></div>}
+    {copyError && <p className="form-error" role="alert">{copyError}</p>}
+    <div className="invitation-result-note"><Mail /><span>{delivered ? 'O link também pode ser copiado se a pessoa precisar de outro canal.' : 'O link é pessoal, temporário e deve ser enviado somente à pessoa convidada.'}</span></div>
+    <button type="button" className="button button-primary" onClick={onClose}>Concluir</button>
+  </section></div>
 }
 
 export function TeamMemberModal({ editing, form, setForm, units, saving, error, onClose, onSubmit, professionalOnly = false }: { editing: TeamMember | null; form: InviteTeamMember; setForm: (form: InviteTeamMember) => void; units: ClinicUnit[]; saving: boolean; error: string; onClose: () => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; professionalOnly?: boolean }) {

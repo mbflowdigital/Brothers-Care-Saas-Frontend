@@ -1,16 +1,13 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Activity, AlertCircle, ArrowDownLeft, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, Command, FileClock, FileText, Filter, HeartPulse, Home, LayoutDashboard, Menu, MessageCircle, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Shield, Sparkles, Stethoscope, UserCog, UserRound, Users, Wallet, X } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { monthlyAppointments, patients, professionals } from './data'
 import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PlansPage, ReportsPage, SettingsPage } from './ExtraViews'
-import { AccountActionPage } from './features/identity/AccountActionPage'
 import { AccountMenu } from './features/identity/AccountMenu'
 import { LoginPage, toUiSession, type AuthenticatedUiSession } from './features/identity/LoginPage'
-import { TenantSelectionPage } from './features/identity/TenantSelectionPage'
 import { getCurrentSession, logout } from './features/identity/accountActionApi'
-import { ClinicOnboardingPage } from './features/onboarding/pages/ClinicOnboardingPage'
 import { PatientForm } from './features/patients/PatientForm'
 import { deactivatePatient, listPatients, type PatientListItem } from './features/patients/patientApi'
 import { ProfessionalsManagementPage } from './features/professionals/ProfessionalsManagementPage'
@@ -18,6 +15,10 @@ import { AppointmentAgendaPage } from './features/scheduling/AppointmentAgendaPa
 import { CreateAppointmentForm } from './features/scheduling/CreateAppointmentForm'
 import { TeamPage, WelcomeTeamCard } from './features/team/TeamPage'
 import { ClinicGettingStarted, getWorkspaceSummary, type WorkspaceSummary } from './features/workspace/ClinicGettingStarted'
+
+const AccountActionPage = lazy(() => import('./features/identity/AccountActionPage').then((module) => ({ default: module.AccountActionPage })))
+const TenantSelectionPage = lazy(() => import('./features/identity/TenantSelectionPage').then((module) => ({ default: module.TenantSelectionPage })))
+const ClinicOnboardingPage = lazy(() => import('./features/onboarding/pages/ClinicOnboardingPage').then((module) => ({ default: module.ClinicOnboardingPage })))
 
 type Session = AuthenticatedUiSession
 const sessionDestination = (session: Session) => {
@@ -80,7 +81,7 @@ export default function App() {
   if (sessionLoading) return <main className="account-action-page"><div className="account-action-card" role="status">Carregando sessão…</div></main>
 
   return <>
-    <Routes>
+    <Suspense fallback={<RouteLoading />}><Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={session ? <Navigate to={sessionDestination(session)} replace /> : <LoginPage onLogin={signIn} />} />
       <Route path="/selecionar-empresa" element={session && session.profile !== 'admin' ? session.tenantId ? <Navigate to={sessionDestination(session)} replace /> : <TenantSelectionPage session={session} onSelect={signIn} /> : <Navigate to="/login" replace />} />
@@ -91,7 +92,7 @@ export default function App() {
       <Route path="/admin/*" element={session?.profile === 'admin' ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} appointmentsRevision={appointmentsRevision} /> : <Navigate to="/login" replace />} />
       <Route path="/app/*" element={session && session.profile !== 'admin' ? session.tenantId ? <Workspace session={session} onLogout={signOut} notify={notify} openModal={setModal} appointmentsRevision={appointmentsRevision} /> : <Navigate to="/selecionar-empresa" replace /> : <Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    </Routes></Suspense>
     {commandOpen && <CommandPalette onClose={() => setCommandOpen(false)} />}
     {modal && <Modal title={modal.title} onClose={() => setModal(null)}>{modal.kind === 'patient'
       ? <PatientForm onDone={(patient) => { setModal(null); window.dispatchEvent(new Event('patients:changed')); notify(`${patient.fullName} foi cadastrado com sucesso.`) }} />
@@ -100,6 +101,10 @@ export default function App() {
         : <><p className="modal-copy">{modal.content}</p><div className="modal-foot"><button className="button button-outline" onClick={() => setModal(null)}>Fechar</button><button className="button button-primary" onClick={() => { setModal(null); notify('Alterações salvas com sucesso.') }}>Confirmar</button></div></>}</Modal>}
     {toast && <div className="toast"><CheckCircle2 />{toast}</div>}
   </>
+}
+
+function RouteLoading() {
+  return <main className="account-action-page"><div className="account-action-card" role="status" aria-live="polite">Carregando experiência…</div></main>
 }
 
 function Brand({ inverse = false }: { inverse?: boolean }) { return <Link to="/" className="public-brand" style={inverse ? { color: 'white' } : undefined}><span className="brand-mark"><HeartPulse size={18} strokeWidth={2.5} /></span><span>brothers care</span></Link> }

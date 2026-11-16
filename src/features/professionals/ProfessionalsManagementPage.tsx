@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Building2, Edit3, Plus, Search, ShieldCheck, Stethoscope, UserRound, UserX } from 'lucide-react'
-import { Modal } from '../../ExtraViews'
+import { Building2, Edit3, Plus, Search, Stethoscope, UserRound, UserX } from 'lucide-react'
+import { InvitationResultModal, TeamMemberModal } from '../team/TeamPage'
 import {
   deactivateTeamMember,
   inviteTeamMember,
@@ -9,6 +9,7 @@ import {
   listTeam,
   updateTeamMember,
   type ClinicUnit,
+  type InvitationResult,
   type InviteTeamMember,
   type TeamMember,
 } from '../team/teamApi'
@@ -24,6 +25,7 @@ const emptyForm: InviteTeamMember = {
   specialty: '',
   councilType: '',
   registrationNumber: '',
+  councilState: '',
 }
 
 function formFromMember(member: TeamMember): InviteTeamMember {
@@ -36,6 +38,8 @@ function formFromMember(member: TeamMember): InviteTeamMember {
     specialty: member.specialty ?? '',
     councilType: member.councilType ?? '',
     registrationNumber: member.registrationNumber ?? '',
+    councilState: member.councilState ?? '',
+    defaultAppointmentDurationMinutes: member.defaultAppointmentDurationMinutes,
   }
 }
 
@@ -49,6 +53,7 @@ export function ProfessionalsManagementPage({ query, setQuery }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [invitation, setInvitation] = useState<{ email: string; result: InvitationResult } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -98,10 +103,6 @@ export function ProfessionalsManagementPage({ query, setQuery }: Props) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!form.clinicUnitIds.length) return setError('Selecione ao menos uma unidade ativa.')
-    if (!form.specialty.trim() || !form.councilType.trim() || !form.registrationNumber.trim()) {
-      return setError('Preencha especialidade, conselho e registro profissional.')
-    }
-
     setSaving(true)
     setError('')
     try {
@@ -109,8 +110,8 @@ export function ProfessionalsManagementPage({ query, setQuery }: Props) {
         await updateTeamMember(editing.membershipId, form)
         setMessage(`${editing.displayName} foi atualizado.`)
       } else {
-        await inviteTeamMember(form)
-        setMessage(`Convite enviado para ${form.email}.`)
+        const result = await inviteTeamMember(form)
+        setInvitation({ email: form.email, result })
       }
       setOpen(false)
       await load()
@@ -152,12 +153,12 @@ export function ProfessionalsManagementPage({ query, setQuery }: Props) {
       </div>
       <div className="table-wrap"><table className="professionals-table"><thead><tr><th>Profissional</th><th>Especialidade</th><th>Conselho</th><th>Unidades</th><th>Status</th><th>Ações</th></tr></thead><tbody>
         {filtered.map((member) => <tr key={member.membershipId}>
-          <td><span className="person-cell"><span className="avatar small">{initials(member.displayName)}</span><span><strong>{member.displayName}</strong><small>{member.email}</small></span></span></td>
-          <td>{member.specialty || 'Não informada'}</td>
-          <td>{member.councilType && member.registrationNumber ? `${member.councilType} · ${member.registrationNumber}` : 'Não informado'}</td>
-          <td>{member.units.map((unit) => unit.name).join(', ') || 'Nenhuma unidade'}</td>
-          <td><span className={`status status-${member.status === 'Active' ? 'ativo' : member.status === 'Invited' ? 'atenção' : 'inativo'}`}>{statusLabel(member.status)}</span></td>
-          <td><div className="row-actions">
+          <td data-label="Profissional"><span className="person-cell"><span className="avatar small">{initials(member.displayName)}</span><span><strong>{member.displayName}</strong><small>{member.email}</small></span></span></td>
+          <td data-label="Especialidade">{member.specialty || 'Não informada'}</td>
+          <td data-label="Conselho">{member.councilType || member.registrationNumber ? [member.councilType, member.registrationNumber, member.councilState].filter(Boolean).join(' · ') : 'Não informado'}</td>
+          <td data-label="Unidades">{member.units.map((unit) => unit.name).join(', ') || 'Nenhuma unidade'}</td>
+          <td data-label="Status"><span className={`status status-${member.status === 'Active' ? 'ativo' : member.status === 'Invited' ? 'atenção' : 'inativo'}`}>{statusLabel(member.status)}</span></td>
+          <td data-label="Ações"><div className="row-actions">
             {(member.status === 'Active' || member.status === 'Invited') && <button onClick={() => beginEdit(member)} title="Editar profissional"><Edit3 /></button>}
             {member.status === 'Revoked' && <button onClick={() => beginCreate(member)} title="Reativar por convite"><Plus /></button>}
             {member.status !== 'Revoked' && !member.isCurrentUser && <button className="danger" onClick={() => void deactivate(member)} title="Desativar profissional"><UserX /></button>}
@@ -169,36 +170,11 @@ export function ProfessionalsManagementPage({ query, setQuery }: Props) {
       </div>
       <div className="table-footer"><span>{filtered.length} de {members.length} profissionais</span></div>
     </section>
-    {open && <Modal title={editing ? 'Editar profissional' : 'Novo profissional'} onClose={() => setOpen(false)}>
-      <ProfessionalEditor editing={editing} form={form} setForm={setForm} units={units} saving={saving} error={error} onSubmit={submit} />
-    </Modal>}
+    {open && <TeamMemberModal editing={editing} form={form} setForm={setForm} units={units} saving={saving} error={error} onClose={() => setOpen(false)} onSubmit={submit} professionalOnly />}
+    {invitation && <InvitationResultModal email={invitation.email} result={invitation.result} onClose={() => setInvitation(null)} />}
   </>
 }
 
 function Metric({ label, value, note, icon: Icon }: { label: string; value: string; note: string; icon: typeof Stethoscope }) {
   return <article className="card kpi-card"><div className="kpi-top"><span>{label}</span><span className="kpi-icon"><Icon /></span></div><div className="kpi-value">{value}</div><div className="kpi-note">{note}</div></article>
-}
-
-function ProfessionalEditor({ editing, form, setForm, units, saving, error, onSubmit }: {
-  editing: TeamMember | null
-  form: InviteTeamMember
-  setForm: (form: InviteTeamMember) => void
-  units: ClinicUnit[]
-  saving: boolean
-  error: string
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void
-}) {
-  return <form className="record-form" onSubmit={onSubmit}>
-    <div className="form-intro"><span className="form-step">01</span><div><strong>Perfil profissional</strong><small>{editing ? 'Atualize a atuação e as unidades.' : 'O profissional receberá um convite por e-mail.'}</small></div></div>
-    <div className="form-grid">
-      <div className="field"><label htmlFor="professional-name">Nome completo <b>*</b></label><input id="professional-name" value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} disabled={Boolean(editing)} required maxLength={200} autoFocus /></div>
-      <div className="field"><label htmlFor="professional-email">E-mail <b>*</b></label><input id="professional-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} disabled={Boolean(editing)} required maxLength={320} /></div>
-      <div className="field"><label htmlFor="professional-specialty">Especialidade <b>*</b></label><input id="professional-specialty" value={form.specialty} onChange={(event) => setForm({ ...form, specialty: event.target.value })} placeholder="Ex.: Fisioterapia" required maxLength={150} /></div>
-      <div className="field"><label htmlFor="professional-council">Conselho <b>*</b></label><input id="professional-council" value={form.councilType} onChange={(event) => setForm({ ...form, councilType: event.target.value.toUpperCase() })} placeholder="Ex.: CREFITO" required maxLength={30} /></div>
-      <div className="field full"><label htmlFor="professional-registration">Número do registro <b>*</b></label><input id="professional-registration" value={form.registrationNumber} onChange={(event) => setForm({ ...form, registrationNumber: event.target.value })} required maxLength={100} /></div>
-      <fieldset className="unit-picker full"><legend>Unidades de atuação</legend>{units.map((unit) => <label key={unit.id}><input type="checkbox" checked={form.clinicUnitIds.includes(unit.id)} onChange={(event) => setForm({ ...form, clinicUnitIds: event.target.checked ? [...form.clinicUnitIds, unit.id] : form.clinicUnitIds.filter((id) => id !== unit.id) })} /><span><Building2 />{unit.name}</span></label>)}</fieldset>
-    </div>
-    {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="form-footer"><span><ShieldCheck size={14} />Histórico preservado por tenant</span><button className="button button-primary" disabled={saving}>{saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Enviar convite'}</button></div>
-  </form>
 }

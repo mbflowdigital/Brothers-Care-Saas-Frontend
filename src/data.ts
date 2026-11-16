@@ -37,16 +37,6 @@ export const tenants = tenantNames.map((name, index) => ({
   access: `${String(15 - index % 4).padStart(2, '0')} out, ${['09:42', '08:16', 'ontem', '11:28'][index % 4]}`,
 }))
 
-export const appointments = [
-  { time: '08:00', patient: 'Regina Oliveira', professional: 'Ana Souza', type: 'Terapia Ocupacional', status: 'Realizado', place: 'Clínica' },
-  { time: '09:00', patient: 'José Almeida', professional: 'Juliana Mendes', type: 'Fisioterapia', status: 'Realizado', place: 'Clínica' },
-  { time: '10:30', patient: 'Helena Costa', professional: 'Ana Souza', type: 'Terapia Ocupacional', status: 'Confirmado', place: 'Domiciliar' },
-  { time: '11:00', patient: 'Marta Rodrigues', professional: 'Rafael Costa', type: 'Fonoaudiologia', status: 'Aguardando', place: 'Clínica' },
-  { time: '14:30', patient: 'Antônio Nogueira', professional: 'Ana Souza', type: 'Terapia Ocupacional', status: 'Confirmado', place: 'Clínica' },
-  { time: '15:00', patient: 'Carlos Mendes', professional: 'Patrícia Alves', type: 'Psicologia', status: 'Reagendado', place: 'Domiciliar' },
-  { time: '16:00', patient: 'Laura Campos', professional: 'Carlos Lima', type: 'Fisioterapia', status: 'Cancelado', place: 'Clínica' },
-]
-
 export const monthlyAppointments = [
   { month: 'Abr', value: 618 }, { month: 'Mai', value: 641 }, { month: 'Jun', value: 675 }, { month: 'Jul', value: 703 }, { month: 'Ago', value: 716 }, { month: 'Set', value: 742 },
 ]

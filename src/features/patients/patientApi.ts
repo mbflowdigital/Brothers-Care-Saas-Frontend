@@ -13,7 +13,7 @@ export type PatientRegistration = {
 
 export type PatientRegistrationOptions = {
   professionals: Array<{ id: string; name: string; specialty: string; clinicUnitIds: string[] }>
-  clinicUnits: Array<{ id: string; name: string }>
+  clinicUnits: Array<{ id: string; name: string; timeZoneId: string }>
 }
 
 export type PatientListItem = {

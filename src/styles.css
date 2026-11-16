@@ -66,6 +66,20 @@
 .table-card th:nth-child(3){width:29%}
 .table-card th:nth-child(4){width:18%;text-align:right;padding-right:18px}
 .table-card td{padding:14px 16px;font-size:12px;line-height:1.45}
+.table-card table:has(th:nth-child(8)){min-width:1180px}
+.table-card table:has(th:nth-child(8)) th:nth-child(1){width:19%}
+.table-card table:has(th:nth-child(8)) th:nth-child(2){width:7%}
+.table-card table:has(th:nth-child(8)) th:nth-child(3){width:14%}
+.table-card table:has(th:nth-child(8)) th:nth-child(4){width:15%}
+.table-card table:has(th:nth-child(8)) th:nth-child(5),.table-card table:has(th:nth-child(8)) th:nth-child(6){width:12%}
+.table-card table:has(th:nth-child(8)) th:nth-child(7){width:8%}
+.table-card table:has(th:nth-child(8)) th:nth-child(8){width:13%}
+.table-card table:has(th:nth-child(8)) th{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.table-card table:has(th:nth-child(8)) th:not(:last-child){text-align:left;padding-right:16px}
+.table-card table:has(th:nth-child(8)) th:last-child,.table-card table:has(th:nth-child(8)) td:last-child{text-align:right}
+.table-card table:has(th:nth-child(8)) td{overflow:hidden;text-overflow:ellipsis}
+.table-card table:has(th:nth-child(8)) td:last-child{overflow:visible}
+.table-card table:has(th:nth-child(8)) td:last-child .filter-actions{justify-content:flex-end;flex-wrap:nowrap;min-width:max-content}
 .table-card td:first-child>strong{display:block;color:#203d4b;font-size:12px;line-height:1.4}
 .table-card .table-secondary{font-size:11px;overflow-wrap:anywhere}
 .table-card .row--pending td{background:#f3faf7}

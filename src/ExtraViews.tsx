@@ -1,23 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Activity, ArrowDownLeft, ArrowRight, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, FileText, Filter, Home, Mail, Plus, Search, Stethoscope, Users, Wallet, X } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { evolutions, formatCurrency, monthlyMrr, patients, professionals, revenueByPlan, tenants } from './data'
+import { evolutions, formatCurrency, patients, professionals, revenueByPlan } from './data'
+import { listTenants, type TenantListItem, type TenantPage } from './features/identity/accountActionApi'
 import { TenantPreRegistrationPage } from './features/tenants/TenantPreRegistrationPage'
 
 const money = (value: number) => formatCurrency(value).replace(',00', '')
 
 type Notify = (message: string) => void
 type ClinicalEntry = (typeof evolutions)[number] & { observations?: string; guidance?: string; modality?: string; duration?: string; attachment?: string }
-type TenantEntry = (typeof tenants)[number] & { contact?: string; email?: string; phone?: string; city?: string; segment?: string }
 type ProfessionalEntry = (typeof professionals)[number] & { email?: string; phone?: string; license?: string; workload?: string; startDate?: string }
 
 function readStoredEntries<T>(key: string): T[] {
   try { return JSON.parse(localStorage.getItem(key) || '[]') as T[] } catch { return [] }
 }
 
-export function readSavedPartners(): TenantEntry[] { return readStoredEntries<TenantEntry>('brothers-care-partners') }
 export function readSavedProfessionals(): ProfessionalEntry[] {
   const saved = readStoredEntries<ProfessionalEntry>('brothers-care-professionals')
   saved.forEach((entry) => { if (!professionals.some((item) => item.id === entry.id)) professionals.push(entry) })
@@ -100,61 +99,59 @@ function Pager() { return <div className="pagination"><button aria-label="Págin
 export function AdminContent({ path, query, setQuery, notify }: { path: string; query: string; setQuery: (value: string) => void; notify: Notify }) {
   void query
   void setQuery
+  void notify
   if (path === '/admin') return <AdminDashboard notify={notify} />
   if (path === '/admin/pre-cadastros') return <TenantPreRegistrationPage />
-  if (path === '/admin/assinaturas') return <DataTable title="Assinaturas" subtitle="Renovações e receita recorrente" headers={['Empresa', 'Plano', 'Valor mensal', 'Próxima cobrança', 'Status']} rows={tenants.slice(0, 8).map((tenant) => [tenant.name, tenant.plan, money(tenant.mrr), '01 nov, 2026', 'Ativa'])} action="Nova assinatura" />
-  if (path === '/admin/planos') return <DataTable title="Planos Brothers Care" subtitle="Oferta comercial para empresas" headers={['Plano', 'Empresas', 'Profissionais', 'MRR', 'Status']} rows={['Starter', 'Professional', 'Enterprise'].map((name, index) => [name, String([8, 15, 3][index]), String([76, 184, 58][index]), money([2392, 11985, 7563][index]), 'Disponível'])} action="Novo plano" />
-  if (path === '/admin/tickets') return <DataTable title="Tickets de suporte" subtitle="Atendimento às empresas clientes" headers={['Ticket', 'Empresa', 'Assunto', 'Responsável', 'Status']} rows={ [['#BC-284', 'Instituto Vitta', 'Ajuste na agenda domiciliar', 'Paulo Mendes', 'Em andamento'], ['#BC-283', 'Clínica Horizonte', 'Dúvida sobre fechamento', 'Carla Souza', 'Aguardando'], ['#BC-282', 'Espaço Reabilitar', 'Convite de profissional', 'Paulo Mendes', 'Concluído'], ['#BC-281', 'Nexus Terapias', 'Relatório por convênio', 'Carla Souza', 'Concluído']] } action="Novo ticket" />
-  return <DataTable title="Atividade global" subtitle="Movimentações recentes na plataforma" headers={['Data', 'Empresa', 'Usuário', 'Evento', 'Módulo']} rows={ [['15 out, 11:12', 'Instituto Vitta', 'Ana Souza', 'Evolução finalizada', 'Evoluções'], ['15 out, 10:30', 'Clínica Horizonte', 'Lucas Martins', 'Novo profissional convidado', 'Equipe'], ['15 out, 09:50', 'Nexus Terapias', 'Marina Lopes', 'Fechamento concluído', 'Financeiro'], ['14 out, 18:02', 'Centro Evoluir', 'Paulo Nunes', 'Plano atualizado', 'Assinaturas']] } action="Exportar" />
+  return <UnavailableAdminModule />
 }
 
 function AdminDashboard({ notify }: { notify: Notify }) {
-  const addedPartners = readSavedPartners()
-  const addedProfessionals = readSavedProfessionals()
-  const totalMrr = 21940 + addedPartners.reduce((sum, partner) => sum + partner.mrr, 0)
-  const totalProfessionals = 318 + addedPartners.reduce((sum, partner) => sum + partner.professionals, 0) + addedProfessionals.length
-  const totalPatients = 2846 + addedPartners.reduce((sum, partner) => sum + partner.patients, 0)
-  const metrics = [['Empresas', String(26 + addedPartners.length), '↑ 3 nos últimos 30 dias', Home], ['Profissionais', String(totalProfessionals), 'Em todas as empresas', Stethoscope], ['Pacientes', totalPatients.toLocaleString('pt-BR'), 'Acompanhamento ativo', Users], ['Atendimentos / mês', '8.472', '↑ 6,2% vs. mês anterior', CalendarDays], ['MRR', money(totalMrr), '↑ 8,4% neste mês', CircleDollarSign], ['ARR', money(totalMrr * 12), 'Receita anual recorrente', Wallet], ['Crescimento', '+8,4%', 'Variação mensal do MRR', ArrowUpRight], ['Churn', '1,8%', 'Dentro da meta de 2%', ArrowDownLeft]] as const
-  return <><div className="grid kpi-grid">{metrics.map(([label, value, note, Icon]) => <Stat key={label} label={label} value={value} note={note} icon={Icon} />)}</div><div className="grid dashboard-grid"><section className="card chart-card"><div className="card-heading"><div><h2>Receita recorrente mensal</h2><p>MRR · últimos 6 meses</p></div><div className="chart-legend"><i />MRR</div></div><div className="chart-wrap"><ResponsiveContainer width="100%" height="100%"><AreaChart data={monthlyMrr} margin={{ top: 10, right: 5, left: -10, bottom: 0 }}><defs><linearGradient id="mrrGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#21d5b2" stopOpacity={0.28} /><stop offset="95%" stopColor="#21d5b2" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="#edf1f2" strokeDasharray="3 4" vertical={false} /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#93a0a5' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#a1adb0' }} tickFormatter={(value) => `R$${Math.round(Number(value) / 1000)}k`} /><Tooltip formatter={(value) => money(Number(value))} contentStyle={{ borderRadius: 8, fontSize: 10 }} /><Area type="monotone" dataKey="value" stroke="#20bea0" strokeWidth={2.5} fill="url(#mrrGradient)" /></AreaChart></ResponsiveContainer></div></section><section className="card activity-card"><div className="card-heading"><div><h2>Atividade global</h2><p>Movimentações recentes</p></div><button className="button button-outline" onClick={() => notify('Indicadores globais atualizados.')}>Atualizar</button></div><div className="activity-list">{[['Nova empresa ativada', 'Clínica Nova Vida iniciou no Professional', 'há 2 h'], ['Assinatura atualizada', 'Nexus Terapias atualizou seu plano', 'há 4 h'], ['Ticket resolvido', 'Espaço Reabilitar · agenda', 'há 5 h']].map(([title, copy, time]) => <div className="activity-item" key={title}><span className="activity-icon"><Activity /></span><div className="activity-copy"><strong>{title}</strong><br />{copy}<small>{time}</small></div></div>)}</div></section></div><section className="card table-card" style={{ marginTop: 15 }}><div className="table-toolbar"><div><h2 className="section-title">Empresas em destaque</h2><span style={{ fontSize: 9, color: '#91a0a5' }}>Visão de saúde e operação dos clientes</span></div><Link className="link-button" to="/admin/empresas">Todas as empresas <ArrowRight size={12} /></Link></div><div className="table-wrap"><TenantTable rows={[...tenants, ...addedPartners].slice(0, 5)} /></div></section></>
+  const [page, setPage] = useState<TenantPage | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      setPage(await listTenants('', 1, 5))
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Não foi possível carregar os dados da plataforma.'
+      setError(message)
+      notify(message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void load() }, [])
+
+  if (loading) return <div className="card card-pad"><p>Carregando dados reais da plataforma...</p></div>
+  if (error) return <section className="card card-pad empty-state"><h3>Não foi possível carregar o painel</h3><p>{error}</p><button className="button button-outline" onClick={() => void load()}>Tentar novamente</button></section>
+
+  const metrics = [
+    ['Empresas', String(page?.totalItems ?? 0), 'Total cadastrado na plataforma', Home],
+    ['Empresas ativas', String(page?.activeCount ?? 0), 'Com acesso ativo', CheckCircle2],
+    ['Onboardings pendentes', String(page?.pendingCount ?? 0), 'Aguardando conclusão', Clock3],
+  ] as const
+
+  return <><div className="grid kpi-grid">{metrics.map(([label, value, note, Icon]) => <Stat key={label} label={label} value={value} note={note} icon={Icon} />)}</div><section className="card table-card" style={{ marginTop: 15 }}><div className="table-toolbar"><div><h2 className="section-title">Empresas recentes</h2><span style={{ fontSize: 9, color: '#91a0a5' }}>Dados reais cadastrados na plataforma</span></div><Link className="link-button" to="/admin/pre-cadastros">Gerenciar empresas <ArrowRight size={12} /></Link></div><div className="table-wrap"><TenantTable rows={page?.items ?? []} /></div></section></>
 }
 
-function TenantTable({ rows }: { rows: typeof tenants }) { return <table><thead><tr>{['Empresa', 'Plano', 'Profissionais', 'Pacientes', 'MRR', 'Status', 'Health score', 'Último acesso'].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map((tenant) => <tr key={tenant.name}><td><span className="person-cell"><span className="tenant-logo" style={{ width: 28, height: 28, fontSize: 9 }}>{tenant.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><strong>{tenant.name}</strong></span></td><td>{tenant.plan}</td><td>{tenant.professionals}</td><td>{tenant.patients}</td><td>{money(tenant.mrr)}</td><td><span className={`status ${tenant.status === 'Ativo' ? 'status-ativo' : 'status-atenção'}`}>{tenant.status}</span></td><td><span className={`status ${tenant.health === 'Excelente' ? 'status-ativo' : tenant.health === 'Bom' ? 'status-bom' : 'status-atenção'}`}>{tenant.health}</span></td><td>{tenant.access}</td></tr>)}</tbody></table> }
+function TenantTable({ rows }: { rows: TenantListItem[] }) {
+  const administratorLabels: Record<string, string> = { Invited: 'Aguardando aceite', Active: 'Administrador ativo', Suspended: 'Administrador suspenso', Revoked: 'Convite revogado', WithoutAdministrator: 'Sem administrador' }
+  if (rows.length === 0) return <div className="empty-state"><h3>Nenhuma empresa cadastrada</h3><p>Os cadastros reais aparecerão aqui.</p></div>
+  return <table><thead><tr>{['Empresa', 'CNPJ', 'Status', 'Primeiro administrador'].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map((tenant) => <tr key={tenant.id}><td><span className="person-cell"><span className="tenant-logo" style={{ width: 28, height: 28, fontSize: 9 }}>{tenant.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span><strong>{tenant.name}</strong></span></td><td>{tenant.cnpj || 'Não informado'}</td><td><span className={`status ${tenant.status === 'Active' ? 'status-ativo' : 'status-aguardando'}`}>{tenant.status}</span></td><td>{administratorLabels[tenant.firstAdministratorStatus] ?? tenant.firstAdministratorStatus}</td></tr>)}</tbody></table>
+}
 
-const adminLinks = [['Visão geral', '/admin'], ['Empresas', '/admin/empresas'], ['Assinaturas', '/admin/assinaturas'], ['Planos', '/admin/planos'], ['Tickets', '/admin/tickets'], ['Atividade global', '/admin/atividade']]
+function UnavailableAdminModule() {
+  return <section className="card card-pad empty-state"><h3>Módulo ainda não integrado</h3><p>Esta área não exibe dados fictícios. Ela será habilitada quando o backend correspondente estiver disponível.</p></section>
+}
+
+const adminLinks = [['Visão geral', '/admin'], ['Pré-cadastros', '/admin/pre-cadastros']]
 const clinicLinks = [['Visão geral', '/app/dashboard'], ['Agenda', '/app/agenda'], ['Pacientes', '/app/pacientes'], ['Profissionais', '/app/profissionais'], ['Atendimentos', '/app/atendimentos'], ['Evoluções', '/app/evolucoes'], ['Financeiro', '/app/financeiro'], ['Convênios', '/app/convenios'], ['Comunicação', '/app/comunicacao'], ['Relatórios', '/app/relatorios'], ['Auditoria', '/app/auditoria'], ['Usuários', '/app/usuarios'], ['Configurações', '/app/configuracoes']]
 export function CommandPalette({ onClose }: { onClose: () => void }) { const [query, setQuery] = useState(''); const navigate = useNavigate(); const location = useLocation(); const links = (location.pathname.startsWith('/admin') ? adminLinks : clinicLinks).filter(([label]) => label.toLowerCase().includes(query.toLowerCase())); return <div className="modal-backdrop command-backdrop" onClick={onClose}><div className="command-modal" onClick={(event) => event.stopPropagation()}><label className="command-search"><Search /><input autoFocus placeholder="Buscar páginas e ações..." value={query} onChange={(event) => setQuery(event.target.value)} /><button className="icon-button" onClick={onClose}><X /></button></label><div className="command-results"><div className="command-label">Navegação</div>{links.length ? links.map(([label, href]) => <button className="command-item" key={href} onClick={() => { navigate(href); onClose() }}><Search />{label}<ArrowRight style={{ marginLeft: 'auto' }} /></button>) : <div className="empty-state" style={{ padding: 22 }}>Nenhum resultado encontrado.</div>}</div></div></div> }
 export function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) { return <div className="modal-backdrop" onClick={onClose}><section className="modal" onClick={(event) => event.stopPropagation()}><header className="modal-head"><h2>{title}</h2><button className="icon-button" onClick={onClose}><X /></button></header><div className="modal-body">{children}</div></section></div> }
-
-export function PartnerForm({ onDone }: { onDone: (message: string) => void }) {
-  const [plan, setPlan] = useState('Professional')
-  const [error, setError] = useState('')
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const values = new FormData(event.currentTarget)
-    const name = String(values.get('company') || '').trim()
-    if (!name) { setError('Informe o nome da empresa parceira.'); return }
-    const planValue = plan as TenantEntry['plan']
-    const newPartner: TenantEntry = {
-      name,
-      contact: String(values.get('contact') || ''),
-      email: String(values.get('email') || ''),
-      phone: String(values.get('phone') || ''),
-      city: String(values.get('city') || ''),
-      segment: String(values.get('segment') || ''),
-      plan: planValue,
-      professionals: Number(values.get('seats') || 1),
-      patients: 0,
-      mrr: plan === 'Starter' ? 299 : plan === 'Enterprise' ? 2499 : 799,
-      status: 'Ativo',
-      health: 'Bom',
-      access: 'Hoje, agora',
-    }
-    const entries = [...readSavedPartners(), newPartner]
-    localStorage.setItem('brothers-care-partners', JSON.stringify(entries))
-    onDone(`${name} foi cadastrada e já está disponível na carteira de parceiros.`)
-  }
-  return <form className="record-form" onSubmit={submit}><div className="form-intro"><span className="form-step">01</span><div><strong>Dados do parceiro</strong><small>Cadastro e ativação da unidade parceira.</small></div></div><div className="form-grid"><div className="field full"><label htmlFor="partner-company">Nome da empresa <b>*</b></label><input id="partner-company" name="company" placeholder="Ex.: Instituto Caminhos" required autoFocus /></div><div className="field"><label htmlFor="partner-contact">Pessoa de contato</label><input id="partner-contact" name="contact" placeholder="Nome do responsável" /></div><div className="field"><label htmlFor="partner-email">E-mail corporativo</label><input id="partner-email" name="email" type="email" placeholder="contato@empresa.com.br" /></div><div className="field"><label htmlFor="partner-phone">Telefone</label><input id="partner-phone" name="phone" type="tel" placeholder="(21) 0000-0000" /></div><div className="field"><label htmlFor="partner-city">Cidade / UF</label><input id="partner-city" name="city" placeholder="Rio de Janeiro, RJ" /></div><div className="field"><label htmlFor="partner-segment">Segmento</label><select id="partner-segment" name="segment"><option>Reabilitação multidisciplinar</option><option>Terapia ocupacional</option><option>Fisioterapia</option><option>Atendimento domiciliar</option><option>Clínica integrada</option></select></div><div className="field"><label htmlFor="partner-plan">Plano inicial</label><select id="partner-plan" value={plan} onChange={(event) => setPlan(event.target.value)}><option>Starter</option><option>Professional</option><option>Enterprise</option></select></div><div className="field"><label htmlFor="partner-seats">Profissionais previstos</label><input id="partner-seats" name="seats" type="number" min="1" max="500" defaultValue="10" /></div><div className="field full"><label className="check-row"><input type="checkbox" name="sendInvite" defaultChecked /><span>Preparar convite de acesso para a pessoa de contato</span></label></div></div>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-footer"><span><CheckCircle2 size={14} />Dados prontos para ativação</span><button className="button button-primary" type="submit"><Check />Cadastrar parceiro</button></div></form>
-}
 
 export function ProfessionalForm({ onDone }: { onDone: (message: string) => void }) {
   const [error, setError] = useState('')

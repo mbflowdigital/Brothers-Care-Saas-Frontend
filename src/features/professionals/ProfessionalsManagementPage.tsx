@@ -24,6 +24,7 @@ const emptyForm: InviteTeamMember = {
   specialty: '',
   councilType: '',
   registrationNumber: '',
+  councilState: '',
 }
 
 function formFromMember(member: TeamMember): InviteTeamMember {
@@ -36,6 +37,8 @@ function formFromMember(member: TeamMember): InviteTeamMember {
     specialty: member.specialty ?? '',
     councilType: member.councilType ?? '',
     registrationNumber: member.registrationNumber ?? '',
+    councilState: member.councilState ?? '',
+    defaultAppointmentDurationMinutes: member.defaultAppointmentDurationMinutes,
   }
 }
 
@@ -98,10 +101,6 @@ export function ProfessionalsManagementPage({ query, setQuery }: Props) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!form.clinicUnitIds.length) return setError('Selecione ao menos uma unidade ativa.')
-    if (!form.specialty.trim() || !form.councilType.trim() || !form.registrationNumber.trim()) {
-      return setError('Preencha especialidade, conselho e registro profissional.')
-    }
-
     setSaving(true)
     setError('')
     try {
@@ -154,7 +153,7 @@ export function ProfessionalsManagementPage({ query, setQuery }: Props) {
         {filtered.map((member) => <tr key={member.membershipId}>
           <td><span className="person-cell"><span className="avatar small">{initials(member.displayName)}</span><span><strong>{member.displayName}</strong><small>{member.email}</small></span></span></td>
           <td>{member.specialty || 'Não informada'}</td>
-          <td>{member.councilType && member.registrationNumber ? `${member.councilType} · ${member.registrationNumber}` : 'Não informado'}</td>
+          <td>{member.councilType || member.registrationNumber ? [member.councilType, member.registrationNumber, member.councilState].filter(Boolean).join(' · ') : 'Não informado'}</td>
           <td>{member.units.map((unit) => unit.name).join(', ') || 'Nenhuma unidade'}</td>
           <td><span className={`status status-${member.status === 'Active' ? 'ativo' : member.status === 'Invited' ? 'atenção' : 'inativo'}`}>{statusLabel(member.status)}</span></td>
           <td><div className="row-actions">
@@ -193,9 +192,11 @@ function ProfessionalEditor({ editing, form, setForm, units, saving, error, onSu
     <div className="form-grid">
       <div className="field"><label htmlFor="professional-name">Nome completo <b>*</b></label><input id="professional-name" value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} disabled={Boolean(editing)} required maxLength={200} autoFocus /></div>
       <div className="field"><label htmlFor="professional-email">E-mail <b>*</b></label><input id="professional-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} disabled={Boolean(editing)} required maxLength={320} /></div>
-      <div className="field"><label htmlFor="professional-specialty">Especialidade <b>*</b></label><input id="professional-specialty" value={form.specialty} onChange={(event) => setForm({ ...form, specialty: event.target.value })} placeholder="Ex.: Fisioterapia" required maxLength={150} /></div>
-      <div className="field"><label htmlFor="professional-council">Conselho <b>*</b></label><input id="professional-council" value={form.councilType} onChange={(event) => setForm({ ...form, councilType: event.target.value.toUpperCase() })} placeholder="Ex.: CREFITO" required maxLength={30} /></div>
-      <div className="field full"><label htmlFor="professional-registration">Número do registro <b>*</b></label><input id="professional-registration" value={form.registrationNumber} onChange={(event) => setForm({ ...form, registrationNumber: event.target.value })} required maxLength={100} /></div>
+      <div className="field"><label htmlFor="professional-specialty">Especialidade <small>(opcional)</small></label><input id="professional-specialty" value={form.specialty} onChange={(event) => setForm({ ...form, specialty: event.target.value })} placeholder="Ex.: Fisioterapia" maxLength={150} /></div>
+      <div className="field"><label htmlFor="professional-council">Conselho <small>(opcional)</small></label><input id="professional-council" value={form.councilType} onChange={(event) => setForm({ ...form, councilType: event.target.value.toUpperCase() })} placeholder="Ex.: CREFITO" maxLength={30} /></div>
+      <div className="field"><label htmlFor="professional-registration">Número do registro <small>(opcional)</small></label><input id="professional-registration" value={form.registrationNumber} onChange={(event) => setForm({ ...form, registrationNumber: event.target.value })} maxLength={100} /></div>
+      <div className="field"><label htmlFor="professional-council-state">UF do registro <small>(opcional)</small></label><input id="professional-council-state" value={form.councilState} onChange={(event) => setForm({ ...form, councilState: event.target.value.toUpperCase().slice(0, 2) })} placeholder="Ex.: SP" maxLength={2} /></div>
+      <div className="field"><label htmlFor="professional-duration">Duração padrão <small>(opcional)</small></label><select id="professional-duration" value={form.defaultAppointmentDurationMinutes ?? ''} onChange={(event) => setForm({ ...form, defaultAppointmentDurationMinutes: event.target.value ? Number(event.target.value) : undefined })}><option value="">Definir depois</option><option value="30">30 minutos</option><option value="45">45 minutos</option><option value="60">60 minutos</option><option value="90">90 minutos</option></select></div>
       <fieldset className="unit-picker full"><legend>Unidades de atuação</legend>{units.map((unit) => <label key={unit.id}><input type="checkbox" checked={form.clinicUnitIds.includes(unit.id)} onChange={(event) => setForm({ ...form, clinicUnitIds: event.target.checked ? [...form.clinicUnitIds, unit.id] : form.clinicUnitIds.filter((id) => id !== unit.id) })} /><span><Building2 />{unit.name}</span></label>)}</fieldset>
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}

@@ -4,7 +4,7 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-r
 import { Activity, AlertCircle, ArrowDownLeft, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, Clock3, Command, FileClock, FileText, Filter, HeartPulse, Home, LayoutDashboard, Menu, MessageCircle, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Shield, Sparkles, Stethoscope, UserCog, UserRound, Users, Wallet, X } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { appointments, evolutions, monthlyAppointments, patients, professionals } from './data'
-import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PlansPage, ProfessionalForm, ReportsPage, SettingsPage } from './ExtraViews'
+import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PlansPage, ReportsPage, SettingsPage } from './ExtraViews'
 import { AccountActionPage } from './features/identity/AccountActionPage'
 import { AccountMenu } from './features/identity/AccountMenu'
 import { LoginPage, toUiSession, type AuthenticatedUiSession } from './features/identity/LoginPage'
@@ -13,6 +13,7 @@ import { getCurrentSession, logout } from './features/identity/accountActionApi'
 import { ClinicOnboardingPage } from './features/onboarding/pages/ClinicOnboardingPage'
 import { PatientForm } from './features/patients/PatientForm'
 import { deactivatePatient, listPatients, type PatientListItem } from './features/patients/patientApi'
+import { ProfessionalsManagementPage } from './features/professionals/ProfessionalsManagementPage'
 import { TeamPage, WelcomeTeamCard } from './features/team/TeamPage'
 import { ClinicGettingStarted, getWorkspaceSummary, type WorkspaceSummary } from './features/workspace/ClinicGettingStarted'
 
@@ -23,7 +24,7 @@ const sessionDestination = (session: Session) => {
   const role = session.memberships.find((item) => item.tenantId === session.tenantId)?.role
   return role === 'Professional' ? '/app/minha-agenda' : role === 'Receptionist' ? '/app/agenda' : '/app/dashboard'
 }
-type ModalRequest = { title: string; content: string; kind?: 'patient' | 'professional' }
+type ModalRequest = { title: string; content: string; kind?: 'patient' }
 type OpenModal = (modal: ModalRequest | null) => void
 const clinicPath = '/app/dashboard'
 const routeLabels: Record<string, string> = {
@@ -89,7 +90,7 @@ export default function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     {commandOpen && <CommandPalette onClose={() => setCommandOpen(false)} />}
-    {modal && <Modal title={modal.title} onClose={() => setModal(null)}>{modal.kind === 'patient' ? <PatientForm onDone={(patient) => { setModal(null); window.dispatchEvent(new Event('patients:changed')); notify(`${patient.fullName} foi cadastrado com sucesso.`) }} /> : modal.kind === 'professional' ? <ProfessionalForm onDone={(message) => { setModal(null); notify(message) }} /> : <><p className="modal-copy">{modal.content}</p><div className="modal-foot"><button className="button button-outline" onClick={() => setModal(null)}>Fechar</button><button className="button button-primary" onClick={() => { setModal(null); notify('Alterações salvas com sucesso.') }}>Confirmar</button></div></>}</Modal>}
+    {modal && <Modal title={modal.title} onClose={() => setModal(null)}>{modal.kind === 'patient' ? <PatientForm onDone={(patient) => { setModal(null); window.dispatchEvent(new Event('patients:changed')); notify(`${patient.fullName} foi cadastrado com sucesso.`) }} /> : <><p className="modal-copy">{modal.content}</p><div className="modal-foot"><button className="button button-outline" onClick={() => setModal(null)}>Fechar</button><button className="button button-primary" onClick={() => { setModal(null); notify('Alterações salvas com sucesso.') }}>Confirmar</button></div></>}</Modal>}
     {toast && <div className="toast"><CheckCircle2 />{toast}</div>}
   </>
 }
@@ -182,7 +183,7 @@ function PageHeading({ title, path, tenantName, notify, openModal }: { title: st
   else if (isDashboard || isAgenda) action = <button className="button button-primary" onClick={() => openModal({ title: 'Novo atendimento', content: 'Selecione paciente, profissional, modalidade e horário para adicionar um atendimento à agenda.' })}><Plus />Novo atendimento</button>
   else if (isEvolution) action = <button className="button button-primary" onClick={() => document.getElementById('evolution-patient')?.focus()}><Plus />Nova evolução</button>
   else if (path === '/app/pacientes') action = <button className="button button-primary" onClick={() => openModal({ title: 'Cadastrar paciente', content: 'Preencha os dados do paciente para iniciar o acompanhamento na clínica.', kind: 'patient' })}><Plus />Novo paciente</button>
-  else if (path === '/app/profissionais') action = <button className="button button-primary" onClick={() => openModal({ title: 'Cadastrar profissional', content: 'Preencha os dados profissionais para adicionar à equipe do Instituto Vitta.', kind: 'professional' })}><Plus />Novo profissional</button>
+  else if (path === '/app/profissionais') action = <button className="button button-primary" onClick={() => window.dispatchEvent(new Event('professionals:create'))}><Plus />Novo profissional</button>
   return <div className="page-heading"><div><div className="eyebrow">{path.startsWith('/admin') ? 'PAINEL SAAS · BROTHERS DIGITAL' : path.includes('minha') || path.includes('meu') ? `ÁREA PROFISSIONAL · ${tenantName}` : `OPERAÇÃO CLÍNICA · ${tenantName}`}</div><h1>{title}</h1><p>{subtitle}</p></div>{action}</div>
 }
 
@@ -194,9 +195,9 @@ function ClinicContent({ path, session, activeTab, setActiveTab, query, setQuery
   if (path===clinicPath) return <><WelcomeTeamCard tenantName={session.tenantName}/><ClinicDashboard notify={notify}/></>
   if (path==='/app/minha-agenda') return <ProfessionalDashboard notify={notify}/>
   if (path==='/app/agenda'||path==='/app/meus-atendimentos') return <AgendaPage professional={session.profile==='professional'} notify={notify} openModal={openModal}/>
-  if (path==='/app/pacientes'||path==='/app/meus-pacientes') return <RealPatientsPage query={query} setQuery={setQuery}/>
+  if (path==='/app/pacientes'||path==='/app/meus-pacientes') return <RealPatientsPage query={query} setQuery={setQuery} professional={session.profile==='professional'}/>
   if (path.startsWith('/app/pacientes/')) return <PatientDetail activeTab={activeTab} setActiveTab={setActiveTab} />
-  if (path==='/app/profissionais') return <ProfessionalsPage query={query} setQuery={setQuery}/>
+  if (path==='/app/profissionais') return <ProfessionalsManagementPage query={query} setQuery={setQuery}/>
   if (path.startsWith('/app/profissionais/')) return <ProfessionalDetail />
   if (path==='/app/evolucoes'||path==='/app/minhas-evolucoes') return <EvolutionPage notify={notify} professional={session.profile==='professional'}/>
   if (path==='/app/financeiro') return <FinancePage notify={notify}/>
@@ -228,7 +229,7 @@ function ProfessionalDashboard({ notify }: { notify: (text: string) => void }) {
 
 function TableToolbar({ query, setQuery, placeholder, children }: { query: string; setQuery: (value:string)=>void; placeholder:string; children?:React.ReactNode }) { return <div className="table-toolbar"><label className="searchbox"><Search/><input placeholder={placeholder} value={query} onChange={(event)=>setQuery(event.target.value)}/></label><div className="filter-actions">{children}<button className="button button-outline"><Filter/>Filtros</button></div></div> }
 
-function RealPatientsPage({ query, setQuery }: { query:string; setQuery:(value:string)=>void }) {
+function RealPatientsPage({ query, setQuery, professional }: { query:string; setQuery:(value:string)=>void; professional:boolean }) {
   const [result, setResult] = useState<{ items: PatientListItem[]; totalItems: number }>({ items: [], totalItems: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -271,10 +272,14 @@ function RealPatientsPage({ query, setQuery }: { query:string; setQuery:(value:s
     }
   }
 
+  if (professional) return <><div className="grid kpi-grid" style={{gridTemplateColumns:'repeat(3,minmax(0,1fr))'}}><Kpi label="Meus pacientes" value={String(result.totalItems)} note="Vínculos assistenciais ativos" icon={Users}/><Kpi label="Pacientes ativos" value={String(result.items.filter((item)=>item.status==='Active').length)} note="Na página atual" icon={UserRound}/><Kpi label="Em acompanhamento" value={String(result.items.filter((item)=>item.professionalId).length)} note="Somente leitura" icon={Stethoscope}/></div><section className="card table-card"><TableToolbar query={query} setQuery={setQuery} placeholder="Buscar meus pacientes por nome ou convênio..."/><div className="table-wrap"><table className="patients-readonly-table"><thead><tr><th>Paciente</th><th>Idade</th><th>Convênio</th><th>Profissional</th><th>Última evolução</th><th>Próxima visita</th><th>Status</th></tr></thead><tbody>{result.items.map((patient)=><tr key={patient.id}><td><span className="person-cell"><span className="avatar small">{initials(patient.fullName)}</span><strong>{patient.fullName}</strong></span></td><td>{age(patient.birthDate)} anos</td><td>{patient.healthPlan || 'Não informado'}</td><td>{patient.professionalName || 'Sem vínculo'}</td><td>—</td><td>—</td><td><span className={`status ${patient.status==='Inactive'?'status-inativo':'status-ativo'}`}>{patient.status==='Inactive'?'Inativo':'Ativo'}</span></td></tr>)}</tbody></table>{loading&&<div className="empty-state"><p>Carregando pacientes...</p></div>}{!loading&&!error&&result.items.length===0&&<div className="empty-state"><Search/><h3>Nenhum paciente associado</h3><p>Os pacientes aparecerão aqui quando um administrador criar o vínculo assistencial.</p></div>}{error&&<div className="empty-state"><AlertCircle/><h3>Não foi possível carregar</h3><p>{error}</p></div>}</div><div className="table-footer"><span>Mostrando {result.items.length} de {result.totalItems} pacientes associados</span></div></section></>
+
   return <><div className="grid kpi-grid" style={{gridTemplateColumns:'repeat(3,minmax(0,1fr))'}}><Kpi label="Pacientes cadastrados" value={String(result.totalItems)} note="Dados reais da empresa ativa" icon={Users}/><Kpi label="Pacientes ativos" value={String(result.items.filter((item)=>item.status==='Active').length)} note="Na página atual" icon={UserRound}/><Kpi label="Com profissional" value={String(result.items.filter((item)=>item.professionalId).length)} note="Vínculo de cuidado ativo" icon={Stethoscope}/></div><section className="card table-card"><TableToolbar query={query} setQuery={setQuery} placeholder="Buscar paciente por nome ou convênio..."/><div className="table-wrap"><table><thead><tr><th>Paciente</th><th>Idade</th><th>Convênio</th><th>Profissional</th><th>Última evolução</th><th>Próxima visita</th><th>Status</th><th>Ações</th></tr></thead><tbody>{result.items.map((patient)=><tr key={patient.id}><td><span className="person-cell"><span className="avatar small">{initials(patient.fullName)}</span><strong>{patient.fullName}</strong></span></td><td>{age(patient.birthDate)} anos</td><td>{patient.healthPlan || 'Não informado'}</td><td>{patient.professionalName || 'Sem vínculo'}</td><td>—</td><td>—</td><td><span className={`status ${patient.status==='Inactive'?'status-inativo':'status-ativo'}`}>{patient.status==='Inactive'?'Inativo':'Ativo'}</span></td><td><div className="filter-actions"><button className="link-button" onClick={()=>setEditing(patient)}>Editar</button>{patient.status!=='Inactive'&&<button className="link-button" disabled={deactivating===patient.id} onClick={()=>deactivate(patient)}>{deactivating===patient.id?'Desativando...':'Desativar'}</button>}</div></td></tr>)}</tbody></table>{loading&&<div className="empty-state"><p>Carregando pacientes...</p></div>}{!loading&&!error&&result.items.length===0&&<div className="empty-state"><Search/><h3>Nenhum paciente encontrado</h3><p>Cadastre o primeiro paciente ou ajuste sua busca.</p></div>}{error&&<div className="empty-state"><AlertCircle/><h3>Não foi possível carregar</h3><p>{error}</p></div>}</div><div className="table-footer"><span>Mostrando {result.items.length} de {result.totalItems} pacientes</span></div></section>{editing&&<Modal title="Editar paciente" onClose={()=>setEditing(null)}><PatientForm patient={editing} onDone={(_patient)=>{setEditing(null);window.dispatchEvent(new Event('patients:changed'));setError('')}}/></Modal>}</>
 }
 
 function ProfessionalsPage({ query, setQuery }: { query:string; setQuery:(value:string)=>void }) { const list=professionals.filter((person)=>person.name.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))||person.specialty.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')));return <><div className="grid kpi-grid" style={{gridTemplateColumns:'repeat(3,minmax(0,1fr))'}}><Kpi label="Profissionais ativos" value={String(professionals.filter((person)=>person.status==='Ativo').length)} note="Equipe multidisciplinar" icon={Stethoscope}/><Kpi label="Atendimentos no mês" value="742" note="Média de 31 por profissional" icon={ClipboardCheck}/><Kpi label="Agenda ocupada" value="86%" note="Disponibilidade desta semana" icon={CalendarDays}/></div><section className="card table-card"><TableToolbar query={query} setQuery={setQuery} placeholder="Buscar por profissional ou especialidade..."><select className="select-mini"><option>Todas as especialidades</option><option>Fisioterapia</option><option>Terapia Ocupacional</option></select></TableToolbar><div className="table-wrap"><table><thead><tr><th>Profissional</th><th>Especialidade</th><th>Agenda</th><th>Pacientes</th><th>Atendimentos do mês</th><th>Status</th><th></th></tr></thead><tbody>{list.map((person)=><tr key={person.id}><td><Link to={`/app/profissionais/${person.id}`} className="person-cell"><span className="avatar small" style={{background:person.color}}>{person.initials}</span><strong>{person.name}</strong></Link></td><td>{person.specialty}</td><td><span className="status status-bom">Disponível</span></td><td>{person.patients}</td><td>{person.appointments}</td><td><span className={`status ${person.status==='Ativo'?'status-ativo':'status-atenção'}`}>{person.status}</span></td><td><Link to={`/app/profissionais/${person.id}`} className="link-button">Abrir</Link></td></tr>)}</tbody></table></div><div className="table-footer"><span>{professionals.length} profissionais na equipe</span><Pagination/></div></section></> }
+
+export { ProfessionalsPage as LegacyProfessionalsPage }
 
 function Pagination() { return <div className="pagination"><button aria-label="Página anterior"><ChevronLeft size={13}/></button><button className="active">1</button><button>2</button><button>3</button><button aria-label="Próxima página"><ChevronRight size={13}/></button></div> }
 

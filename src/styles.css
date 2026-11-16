@@ -80,6 +80,25 @@
 .table-card table:has(th:nth-child(8)) td{overflow:hidden;text-overflow:ellipsis}
 .table-card table:has(th:nth-child(8)) td:last-child{overflow:visible}
 .table-card table:has(th:nth-child(8)) td:last-child .filter-actions{justify-content:flex-end;flex-wrap:nowrap;min-width:max-content}
+.table-card .professionals-table{min-width:1050px;table-layout:fixed}
+.table-card .professionals-table th{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;padding-right:16px}
+.table-card .professionals-table th:nth-child(1){width:24%}
+.table-card .professionals-table th:nth-child(2){width:16%}
+.table-card .professionals-table th:nth-child(3){width:18%}
+.table-card .professionals-table th:nth-child(4){width:22%;text-align:left}
+.table-card .professionals-table th:nth-child(5){width:11%}
+.table-card .professionals-table th:nth-child(6){width:9%;text-align:right}
+.table-card .professionals-table td{overflow:hidden;text-overflow:ellipsis}
+.table-card .professionals-table td:last-child{overflow:visible;text-align:right}
+.table-card .patients-readonly-table{min-width:1080px;table-layout:fixed}
+.table-card .patients-readonly-table th{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;padding-right:16px}
+.table-card .patients-readonly-table th:nth-child(1){width:21%}
+.table-card .patients-readonly-table th:nth-child(2){width:8%}
+.table-card .patients-readonly-table th:nth-child(3){width:15%}
+.table-card .patients-readonly-table th:nth-child(4){width:17%;text-align:left}
+.table-card .patients-readonly-table th:nth-child(5),.table-card .patients-readonly-table th:nth-child(6){width:14%}
+.table-card .patients-readonly-table th:nth-child(7){width:11%}
+.table-card .patients-readonly-table td{overflow:hidden;text-overflow:ellipsis}
 .table-card td:first-child>strong{display:block;color:#203d4b;font-size:12px;line-height:1.4}
 .table-card .table-secondary{font-size:11px;overflow-wrap:anywhere}
 .table-card .row--pending td{background:#f3faf7}

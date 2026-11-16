@@ -56,6 +56,7 @@ O Brothers Care reúne a operação diária de uma clínica multidisciplinar: pa
 | `/vitta` | Página institucional do Instituto Vitta |
 | `/app/dashboard` | Visão geral da clínica |
 | `/app/agenda` | Agenda e atendimentos |
+| `/app/minha-agenda` | Agenda do profissional |
 | `/app/pacientes` | Pacientes e perfis individuais |
 | `/app/profissionais` | Equipe e perfis profissionais |
 | `/app/evolucoes` | Registro e histórico clínico de demonstração |
@@ -70,7 +71,7 @@ O Brothers Care reúne a operação diária de uma clínica multidisciplinar: pa
 | `/admin/tickets` | Suporte às empresas |
 | `/admin/atividade` | Atividade global |
 
-As rotas internas exigem uma sessão de demonstração. A navegação muda conforme o perfil conectado.
+As rotas internas exigem uma sessão válida. O frontend usa cookies para a sessão do backend; em desenvolvimento, o Vite encaminha `/api` para `http://localhost:5100`. A navegação muda conforme o perfil conectado.
 
 ## Estrutura técnica atual
 
@@ -93,7 +94,7 @@ As rotas internas exigem uma sessão de demonstração. A navegação muda confo
 
 **Stack:** React 19, TypeScript, Vite, React Router, Tailwind CSS, Recharts e Lucide.
 
-**Fluxo atual:** o navegador mantém a sessão e os novos cadastros no armazenamento local. Não há API, banco de dados, envio de e-mail, autenticação real ou isolamento de tenant no servidor. Os dados de pacientes e evoluções são cenográficos e não devem ser substituídos por dados reais.
+**Fluxo atual:** a integração é parcial. Login/sessão, alguns cadastros e a agenda usam a API. Profissionais consultam sua própria agenda e podem criar agendamentos; administradores da clínica consultam o tenant ativo e filtram por profissional e unidade. As visualizações dia, semana, mês e lista usam o fuso da unidade selecionada. Outros módulos e indicadores ainda usam dados de demonstração, alguns mantidos no `localStorage`. O backend precisa estar configurado e conectado ao banco para testar fluxos persistidos. Não use dados clínicos reais nesta aplicação.
 
 ## Direção de arquitetura
 

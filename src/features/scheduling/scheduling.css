@@ -417,6 +417,19 @@
   font-size: 10px;
 }
 
+.appointment-no-show-warning {
+  border-color: #f3e4bd;
+  background: #fffaf0;
+}
+
+.appointment-no-show-warning svg {
+  color: #aa7b25;
+}
+
+.appointment-no-show-warning strong {
+  color: #725522;
+}
+
 .appointment-cancel-form textarea {
   resize: vertical;
   min-height: 70px;

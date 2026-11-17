@@ -224,6 +224,45 @@ export async function cancelAppointment(
   return response.json() as Promise<CreatedAppointment>
 }
 
+export async function completeAppointment(appointmentId: string): Promise<CreatedAppointment> {
+  return postAppointmentAction(appointmentId, 'complete')
+}
+
+export async function markAppointmentNoShow(
+  appointmentId: string,
+  input: CancelAppointmentInput,
+): Promise<CreatedAppointment> {
+  return postAppointmentAction(appointmentId, 'no-show', input)
+}
+
+async function postAppointmentAction(
+  appointmentId: string,
+  action: 'complete' | 'no-show',
+  input?: unknown,
+): Promise<CreatedAppointment> {
+  let response: Response
+  try {
+    const csrf = await getCsrfToken()
+    response = await fetch(`${apiBaseUrl}/appointments/${appointmentId}/${action}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        [csrf.headerName]: csrf.token,
+      },
+      body: input ? JSON.stringify(input) : undefined,
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de agenda.')
+  }
+
+  if (!response.ok) return throwResponseError(response, 'Não foi possível atualizar o atendimento.', {
+    409: 'Esta ação só está disponível após o início de um atendimento ainda agendado.',
+  })
+  return response.json() as Promise<CreatedAppointment>
+}
+
 async function getCsrfToken(): Promise<{ token: string; headerName: string }> {
   const response = await fetch(`${apiBaseUrl}/auth/csrf-token`, {
     credentials: 'include',

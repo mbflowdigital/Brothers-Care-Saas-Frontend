@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, FileText, MapPin, Stethoscope, UserRound, X } from 'lucide-react'
+import { CalendarCheck2, CalendarDays, ChevronLeft, ChevronRight, Clock3, FileText, MapPin, Stethoscope, UserRound, X } from 'lucide-react'
 import { getPatientRegistrationOptions } from '../patients/patientApi'
 import { CancelAppointmentForm } from './CancelAppointmentForm'
+import { MarkNoShowForm } from './MarkNoShowForm'
 import { RescheduleAppointmentForm } from './RescheduleAppointmentForm'
 import './scheduling.css'
 import {
@@ -16,7 +17,7 @@ import {
   shiftAgendaDate,
   type AgendaView,
 } from './dateTime'
-import { getAppointment, getSchedulingOptions, listAppointments, type AppointmentScheduleItem } from './schedulingApi'
+import { completeAppointment, getAppointment, getSchedulingOptions, listAppointments, type AppointmentScheduleItem } from './schedulingApi'
 
 type AgendaViewerRole = 'professional' | 'clinicAdministrator' | 'unsupported'
 type AgendaUnit = { id: string; name: string; timeZoneId: string }
@@ -445,6 +446,9 @@ function AppointmentDetailsDialog({
   const [error, setError] = useState('')
   const [rescheduling, setRescheduling] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [markingNoShow, setMarkingNoShow] = useState(false)
+  const [completing, setCompleting] = useState(false)
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -463,6 +467,20 @@ function AppointmentDetailsDialog({
 
   const timeZoneId = appointment.timeZoneId || 'UTC'
   const statusLabel = statusLabels[appointment.status] ?? appointment.status
+  const hasStarted = Date.parse(appointment.startsAt) <= Date.now()
+
+  async function complete() {
+    setActionError('')
+    setCompleting(true)
+    try {
+      await completeAppointment(appointment.id)
+      onChanged()
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : 'Não foi possível concluir o atendimento.')
+    } finally {
+      setCompleting(false)
+    }
+  }
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
     if (event.target === event.currentTarget) onClose()
   }}>
@@ -476,6 +494,7 @@ function AppointmentDetailsDialog({
       </header>
       <div className="modal-body appointment-details-body">
         {error && <p className="appointment-details-warning" role="alert">{error}</p>}
+        {actionError && <p className="appointment-details-warning" role="alert">{actionError}</p>}
         <div className="appointment-details-highlight">
           <CalendarDays />
           <div>
@@ -503,9 +522,19 @@ function AppointmentDetailsDialog({
               onCompleted={onChanged}
               onCancel={() => setCancelling(false)}
             />
+            : markingNoShow
+              ? <MarkNoShowForm
+                appointment={appointment}
+                onCompleted={onChanged}
+                onCancel={() => setMarkingNoShow(false)}
+              />
           : <div className="appointment-details-actions">
             <button type="button" className="button button-outline" onClick={() => setRescheduling(true)}>Reagendar</button>
             <button type="button" className="button button-danger" onClick={() => setCancelling(true)}>Cancelar</button>
+            {hasStarted && <>
+              <button type="button" className="button button-outline" onClick={() => setMarkingNoShow(true)}>Registrar falta</button>
+              <button type="button" className="button button-primary" onClick={() => void complete()} disabled={completing}><CalendarCheck2 />{completing ? 'Concluindo…' : 'Concluir atendimento'}</button>
+            </>}
           </div>)}
       </div>
     </section>

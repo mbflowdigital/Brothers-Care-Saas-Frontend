@@ -1,0 +1,43 @@
+.clinical-linked-appointment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid #bfe7dc;
+  border-radius: 14px;
+  background: #effaf6;
+}
+
+.clinical-linked-appointment > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.clinical-linked-appointment svg {
+  width: 20px;
+  color: #138a72;
+}
+
+.clinical-linked-appointment span {
+  display: grid;
+  gap: 3px;
+}
+
+.clinical-linked-appointment strong {
+  font-size: 12px;
+  color: #173f49;
+}
+
+.clinical-linked-appointment small {
+  font-size: 10px;
+  color: #668087;
+}
+
+@media (max-width: 700px) {
+  .clinical-linked-appointment {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

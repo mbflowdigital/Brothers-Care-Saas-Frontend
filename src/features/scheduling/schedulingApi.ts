@@ -12,6 +12,12 @@ export type SchedulingClinicUnitOption = {
   timeZoneId: string
 }
 
+export type SchedulingProfessionalOption = {
+  id: string
+  name: string
+  specialty: string | null
+}
+
 export type SchedulingOptions = {
   professionalId: string
   patients: SchedulingPatientOption[]
@@ -79,6 +85,7 @@ export type AvailableAppointmentSlot = {
 }
 
 export type CreateAppointmentInput = {
+  professionalId?: string
   patientId: string
   clinicUnitId: string
   startsAt: string
@@ -99,21 +106,24 @@ export type CreatedAppointment = {
 }
 
 export type RescheduleAppointmentInput = {
+  professionalId?: string
   clinicUnitId: string
   startsAt: string
   endsAt: string
 }
 
 export type CancelAppointmentInput = {
+  professionalId?: string
   reason: string
 }
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
-export async function getSchedulingOptions(): Promise<SchedulingOptions> {
+export async function getSchedulingOptions(professionalId?: string): Promise<SchedulingOptions> {
+  const parameters = professionalId ? `?professionalId=${encodeURIComponent(professionalId)}` : ''
   let response: Response
   try {
-    response = await fetch(`${apiBaseUrl}/appointments/options`, {
+    response = await fetch(`${apiBaseUrl}/appointments/options${parameters}`, {
       credentials: 'include',
       signal: AbortSignal.timeout(15000),
     })
@@ -130,6 +140,25 @@ export async function getSchedulingOptions(): Promise<SchedulingOptions> {
     },
   )
   return response.json() as Promise<SchedulingOptions>
+}
+
+export async function getSchedulingProfessionals(): Promise<SchedulingProfessionalOption[]> {
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/appointments/professionals`, {
+      credentials: 'include',
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de agenda.')
+  }
+
+  if (!response.ok) return throwResponseError(
+    response,
+    'Não foi possível carregar os profissionais disponíveis.',
+    { 403: 'Você não possui acesso à agenda desta empresa.' },
+  )
+  return response.json() as Promise<SchedulingProfessionalOption[]>
 }
 
 export async function createAppointment(input: CreateAppointmentInput): Promise<CreatedAppointment> {

@@ -6,18 +6,24 @@ import {
   createAppointment,
   getAvailableAppointmentSlots,
   getSchedulingOptions,
+  getSchedulingProfessionals,
   type AvailableAppointmentSlot,
   type SchedulingOptions,
 } from './schedulingApi'
 
 const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 
-export function CreateAppointmentForm({ onCreated }: { onCreated: () => void }) {
+export function CreateAppointmentForm({ onCreated, viewerRole }: {
+  onCreated: () => void
+  viewerRole: 'professional' | 'clinicManager'
+}) {
   const [options, setOptions] = useState<SchedulingOptions | null>(null)
   const [loadingOptions, setLoadingOptions] = useState(true)
   const [optionsError, setOptionsError] = useState('')
   const [retry, setRetry] = useState(0)
   const [patientId, setPatientId] = useState('')
+  const [professionalId, setProfessionalId] = useState('')
+  const [professionals, setProfessionals] = useState<Array<{ id: string; name: string; specialty: string | null }>>([])
   const [clinicUnitId, setClinicUnitId] = useState('')
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedTime, setSelectedTime] = useState('')
@@ -35,7 +41,18 @@ export function CreateAppointmentForm({ onCreated }: { onCreated: () => void }) 
     let active = true
     setLoadingOptions(true)
     setOptionsError('')
-    getSchedulingOptions()
+    const load = async () => {
+      if (viewerRole === 'professional') return getSchedulingOptions()
+      const available = await getSchedulingProfessionals()
+      const selectedId = professionalId && available.some((item) => item.id === professionalId)
+        ? professionalId
+        : available[0]?.id ?? ''
+      setProfessionals(available)
+      setProfessionalId(selectedId)
+      if (!selectedId) throw new Error('Nenhum profissional ativo está disponível para agendamento.')
+      return getSchedulingOptions(selectedId)
+    }
+    load()
       .then((result) => {
         if (!active) return
         setOptions(result)
@@ -55,7 +72,31 @@ export function CreateAppointmentForm({ onCreated }: { onCreated: () => void }) 
       })
       .finally(() => { if (active) setLoadingOptions(false) })
     return () => { active = false }
-  }, [retry])
+  }, [retry, viewerRole])
+
+  async function changeProfessional(nextProfessionalId: string) {
+    setProfessionalId(nextProfessionalId)
+    setPatientId('')
+    setOptionsError('')
+    setLoadingOptions(true)
+    try {
+      const result = await getSchedulingOptions(nextProfessionalId)
+      setOptions(result)
+      const initialUnit = result.clinicUnits[0]
+      setClinicUnitId(initialUnit?.id ?? '')
+      if (initialUnit) {
+        const date = getTodayInTimeZone(initialUnit.timeZoneId)
+        setSelectedDate(date)
+        setVisibleMonth(`${date.slice(0, 7)}-01`)
+      }
+      setDurationMinutes(result.defaultAppointmentDurationMinutes || 60)
+      setSelectedTime('')
+    } catch (caught) {
+      setOptionsError(caught instanceof Error ? caught.message : 'Não foi possível carregar a agenda do profissional.')
+    } finally {
+      setLoadingOptions(false)
+    }
+  }
 
   const selectedUnit = options?.clinicUnits.find((unit) => unit.id === clinicUnitId)
   const timeZoneId = selectedUnit?.timeZoneId ?? 'America/Sao_Paulo'
@@ -138,6 +179,7 @@ export function CreateAppointmentForm({ onCreated }: { onCreated: () => void }) 
       }
       setSubmitting(true)
       await createAppointment({
+        professionalId: viewerRole === 'clinicManager' ? professionalId : undefined,
         patientId,
         clinicUnitId,
         startsAt: selectedSlot.startsAt,
@@ -165,6 +207,7 @@ export function CreateAppointmentForm({ onCreated }: { onCreated: () => void }) 
           ? <p className="modal-copy" role="status">Não há pacientes ativos vinculados ou unidades disponíveis para agendamento.</p>
           : <>
             <div className="form-grid">
+              {viewerRole === 'clinicManager' && <div className="field full"><label htmlFor="appointment-professional">Profissional <b>*</b></label><select id="appointment-professional" value={professionalId} onChange={(event) => void changeProfessional(event.target.value)} required><option value="" disabled>Selecione um profissional</option>{professionals.map((professional) => <option key={professional.id} value={professional.id}>{professional.name} · {professional.specialty || 'Especialidade não informada'}</option>)}</select></div>}
               <div className="field full"><label htmlFor="appointment-patient">Paciente <b>*</b></label><select id="appointment-patient" value={patientId} onChange={(event) => { setPatientId(event.target.value); setSelectedTime(''); setError('') }} required><option value="" disabled>Selecione um paciente</option>{options?.patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.fullName}</option>)}</select></div>
               <div className="field full"><label htmlFor="appointment-unit">Unidade <b>*</b></label><select id="appointment-unit" value={clinicUnitId} onChange={(event) => changeUnit(event.target.value)} required><option value="" disabled>Selecione uma unidade</option>{options?.clinicUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></div>
             </div>
@@ -195,7 +238,7 @@ export function CreateAppointmentForm({ onCreated }: { onCreated: () => void }) 
             <div className="field full"><label htmlFor="appointment-notes">Observação <span>(opcional)</span></label><textarea id="appointment-notes" value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} rows={3} /><small>{notes.length}/1000 caracteres</small></div>
           </>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="form-footer"><span><CheckCircle2 size={13}/>O profissional e a empresa são definidos pela sessão.</span><button className="button button-primary" type="submit" disabled={loadingOptions || loadingSlots || submitting || !hasOptions || !selectedSlot}>{submitting ? 'Salvando…' : 'Criar agendamento'}</button></div>
+    <div className="form-footer"><span><CheckCircle2 size={13}/>{viewerRole === 'professional' ? 'O profissional é definido pela sua sessão.' : 'O profissional e a unidade serão validados antes de agendar.'}</span><button className="button button-primary" type="submit" disabled={loadingOptions || loadingSlots || submitting || !hasOptions || !selectedSlot}>{submitting ? 'Salvando…' : 'Criar agendamento'}</button></div>
   </form>
 }
 

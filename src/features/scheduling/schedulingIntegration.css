@@ -1,0 +1,38 @@
+.appointment-completed-next {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #bfe7dc;
+  border-radius: 14px;
+  background: #effaf6;
+}
+
+.appointment-completed-next > svg {
+  width: 24px;
+  color: #138a72;
+}
+
+.appointment-completed-next strong {
+  color: #173f49;
+  font-size: 13px;
+}
+
+.appointment-completed-next p {
+  margin: 4px 0 0;
+  color: #668087;
+  font-size: 11px;
+}
+
+.appointment-completed-next > div:last-child {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .appointment-completed-next > div:last-child {
+    display: grid;
+  }
+}

@@ -35,7 +35,7 @@ export function RescheduleAppointmentForm({ appointment, onCompleted, onCancel }
 
   useEffect(() => {
     let active = true
-    getSchedulingOptions()
+    getSchedulingOptions(appointment.professionalId)
       .then((result) => {
         if (!active) return
         setOptions(result)
@@ -105,6 +105,7 @@ export function RescheduleAppointmentForm({ appointment, onCompleted, onCancel }
       }
       setSubmitting(true)
       await rescheduleAppointment(appointment.id, {
+        professionalId: appointment.professionalId,
         clinicUnitId: selectedUnit.id,
         startsAt: selectedSlot.startsAt,
         endsAt: selectedSlot.endsAt,

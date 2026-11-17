@@ -49,8 +49,17 @@ async function write<T>(path: string, method: 'POST' | 'PATCH', body: unknown, f
 export const getClinicalRecordOptions = () => read<ClinicalRecordOptions>('/clinical-records/options', 'Não foi possível preparar o prontuário.')
 export const listClinicalRecords = (patientId: string) => read<ClinicalRecordSummary[]>(`/patients/${patientId}/clinical-records`, 'Não foi possível carregar o histórico clínico.')
 export const getClinicalRecord = (recordId: string) => read<ClinicalRecord>(`/clinical-records/${recordId}`, 'Não foi possível abrir esta evolução.')
-export const createClinicalRecord = (patientId: string, clinicUnitId: string, input: ClinicalRecordInput) =>
-  write<ClinicalRecord>('/clinical-records', 'POST', { patientId, clinicUnitId, ...input }, 'Não foi possível salvar o rascunho.')
+export const createClinicalRecord = (
+  patientId: string,
+  clinicUnitId: string,
+  input: ClinicalRecordInput,
+  appointmentId?: string,
+) => write<ClinicalRecord>(
+  '/clinical-records',
+  'POST',
+  { patientId, clinicUnitId, ...input, appointmentId: appointmentId || null },
+  'Não foi possível salvar o rascunho.',
+)
 export const updateClinicalRecord = (recordId: string, version: string, input: ClinicalRecordInput) =>
   write<ClinicalRecord>(`/clinical-records/${recordId}`, 'PATCH', { ...input, version }, 'Não foi possível atualizar o rascunho.')
 export const finalizeClinicalRecord = (recordId: string, version: string) =>

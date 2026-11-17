@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, ArrowLeft, Check, ChevronRight, Clock3, FileCheck2, FileText, LoaderCircle, LockKeyhole, Paperclip, Save, ShieldCheck, Stethoscope, UserRound, X } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { createClinicalRecord, finalizeClinicalRecord, getClinicalRecord, getClinicalRecordOptions, listClinicalRecords, updateClinicalRecord, type ClinicalRecord, type ClinicalRecordInput, type ClinicalRecordOptions, type ClinicalRecordSummary } from './clinicalRecordsApi'
+import { getAppointment, type AppointmentScheduleItem } from '../scheduling/schedulingApi'
 import './clinicalRecords.css'
+import './clinicalRecordsLinked.css'
 
 const emptyInput: ClinicalRecordInput = { patientReport: '', proceduresAndObservations: '', assessmentAndPlan: '' }
 const dateTime = (value: string) => new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 
 export function ClinicalRecordsPage() {
+  const [searchParameters, setSearchParameters] = useSearchParams()
+  const requestedAppointmentId = searchParameters.get('appointmentId') ?? ''
   const [options, setOptions] = useState<ClinicalRecordOptions | null>(null)
   const [patientId, setPatientId] = useState('')
   const [unitId, setUnitId] = useState('')
@@ -20,6 +25,7 @@ export function ClinicalRecordsPage() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [linkedAppointment, setLinkedAppointment] = useState<AppointmentScheduleItem | null>(null)
 
   const patient = options?.patients.find(item => item.id === patientId)
   const availableUnits = useMemo(() => options?.units.filter(unit => patient?.clinicUnitIds.includes(unit.id)) ?? [], [options, patient])
@@ -34,12 +40,26 @@ export function ClinicalRecordsPage() {
   }, [])
 
   useEffect(() => {
-    getClinicalRecordOptions().then(result => {
+    Promise.all([
+      getClinicalRecordOptions(),
+      requestedAppointmentId ? getAppointment(requestedAppointmentId) : Promise.resolve(null),
+    ]).then(([result, appointment]) => {
       setOptions(result)
-      const firstPatient = result.patients[0]
-      if (firstPatient) { setPatientId(firstPatient.id); setUnitId(firstPatient.clinicUnitIds[0] ?? '') }
+      if (appointment) {
+        if (appointment.status !== 'Completed') throw new Error('Conclua o atendimento antes de registrar a evolução.')
+        const allowedPatient = result.patients.find(item => item.id === appointment.patientId)
+        if (!allowedPatient || !allowedPatient.clinicUnitIds.includes(appointment.clinicUnitId)) {
+          throw new Error('Este atendimento não está disponível para o seu vínculo assistencial atual.')
+        }
+        setLinkedAppointment(appointment)
+        setPatientId(appointment.patientId)
+        setUnitId(appointment.clinicUnitId)
+      } else {
+        const firstPatient = result.patients[0]
+        if (firstPatient) { setPatientId(firstPatient.id); setUnitId(firstPatient.clinicUnitIds[0] ?? '') }
+      }
     }).catch(caught => setError(caught instanceof Error ? caught.message : 'Não foi possível abrir o prontuário.')).finally(() => setLoading(false))
-  }, [])
+  }, [requestedAppointmentId])
 
   useEffect(() => { if (patientId) void loadHistory(patientId) }, [patientId, loadHistory])
   useEffect(() => {
@@ -78,7 +98,7 @@ export function ClinicalRecordsPage() {
     try {
       const saved = current
         ? await updateClinicalRecord(current.id, current.version, form)
-        : await createClinicalRecord(patientId, unitId, form)
+        : await createClinicalRecord(patientId, unitId, form, linkedAppointment?.id)
       setCurrent(saved); setForm({ patientReport: saved.patientReport, proceduresAndObservations: saved.proceduresAndObservations, assessmentAndPlan: saved.assessmentAndPlan })
       setDirty(false); if (showMessage) setMessage('Rascunho salvo com segurança.')
       await loadHistory(patientId); return saved
@@ -111,6 +131,7 @@ export function ClinicalRecordsPage() {
     {message && <div className="clinical-feedback success" role="status"><Check /><span>{message}</span><button onClick={() => setMessage('')} aria-label="Fechar aviso"><X /></button></div>}
 
     <div className="clinical-layout"><main className="clinical-editor">
+      {linkedAppointment && <section className="clinical-linked-appointment"><CalendarLinkLabel appointment={linkedAppointment}/><button type="button" className="link-button" onClick={() => { setLinkedAppointment(null); setSearchParameters({}); }}>Desvincular</button></section>}
       <section className="clinical-context" aria-label="Contexto da evolução"><label><span>Paciente</span><select id="evolution-patient" value={patientId} onChange={event => changePatient(event.target.value)} disabled={Boolean(current)}>{options.patients.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label><span>Unidade</span><select value={unitId} onChange={event => { setUnitId(event.target.value); setDirty(true) }} disabled={Boolean(current)}>{availableUnits.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><div><span>Profissional autor</span><strong><UserRound />{options.author.name}</strong><small>{options.author.specialty || 'Especialidade não informada'}</small></div><div><span>Situação</span><strong className={`record-status ${finalized ? 'finalized' : 'draft'}`}>{finalized ? <FileCheck2 /> : <Clock3 />}{finalized ? 'Finalizada' : 'Rascunho'}</strong></div></section>
 
       <section className="clinical-writing"><ClinicalField number="1" title="Estado e relato do paciente" description="Queixas, sintomas, estado inicial e mudanças percebidas desde o último encontro." optional value={form.patientReport} onChange={value => setField('patientReport', value)} disabled={finalized} placeholder="Ex.: Paciente relata redução da dor e maior segurança nas atividades diárias…" /><ClinicalField number="2" title="Procedimentos e observações" description="Atividades realizadas, intervenções, resposta ao tratamento e observações objetivas." value={form.proceduresAndObservations} onChange={value => setField('proceduresAndObservations', value)} disabled={finalized} placeholder="Descreva o que foi realizado e como o paciente respondeu…" /><ClinicalField number="3" title="Avaliação e próximas condutas" description="Progresso, orientações, plano de continuidade e próximos passos." value={form.assessmentAndPlan} onChange={value => setField('assessmentAndPlan', value)} disabled={finalized} placeholder="Registre sua avaliação e a conduta definida para continuidade…" /></section>
@@ -124,6 +145,11 @@ export function ClinicalRecordsPage() {
 
     {confirming && <div className="modal-backdrop"><section className="modal clinical-confirm" role="dialog" aria-modal="true" aria-labelledby="finalize-title"><span><LockKeyhole /></span><h2 id="finalize-title">Finalizar esta evolução?</h2><p>Depois de finalizada, a evolução ficará protegida contra edição direta. Revise o conteúdo antes de confirmar.</p><div><button className="button button-outline" onClick={() => setConfirming(false)} disabled={saving}>Continuar revisando</button><button className="button button-primary" onClick={() => void confirmFinalization()} disabled={saving}>{saving ? <LoaderCircle className="spin" /> : <FileCheck2 />}Confirmar finalização</button></div></section></div>}
   </div>
+}
+
+function CalendarLinkLabel({ appointment }: { appointment: AppointmentScheduleItem }) {
+  const when = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short', timeZone: appointment.timeZoneId }).format(new Date(appointment.startsAt))
+  return <div><FileCheck2 /><span><strong>Atendimento concluído vinculado</strong><small>{appointment.patientName} · {when} · {appointment.clinicUnitName}</small></span></div>
 }
 
 function ClinicalField({ number, title, description, optional, value, onChange, disabled, placeholder }: { number: string; title: string; description: string; optional?: boolean; value: string; onChange: (value: string) => void; disabled: boolean; placeholder: string }) {

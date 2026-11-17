@@ -174,7 +174,9 @@
 }
 
 .agenda-appointment {
+  width: 100%;
   display: grid;
+  border: 0;
   gap: 4px;
   margin-top: 7px;
   border: 1px solid #e8efee;
@@ -184,6 +186,17 @@
   padding: 8px;
   color: #657a82;
   font-size: 9px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agenda-appointment:hover,
+.agenda-appointment:focus-visible {
+  border-color: #bfe5db;
+  background: #f4fbf8;
+  outline: none;
+  box-shadow: 0 0 0 2px #25c6a51f;
 }
 
 .agenda-appointment time {
@@ -251,6 +264,110 @@
   padding: 10px;
 }
 
+.appointment-details-modal {
+  width: min(600px, 100%);
+}
+
+.appointment-details-modal .modal-head small {
+  display: block;
+  margin-bottom: 3px;
+  color: #82959c;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.appointment-details-body {
+  display: grid;
+  gap: 16px;
+}
+
+.appointment-details-warning {
+  margin: 0;
+  border-radius: 7px;
+  background: #fff4ef;
+  padding: 9px 11px;
+  color: #a75b4d;
+  font-size: 10px;
+}
+
+.appointment-details-highlight {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 11px;
+  border-radius: 9px;
+  background: #eff9f6;
+  padding: 13px;
+}
+
+.appointment-details-highlight > svg {
+  width: 19px;
+  color: #259b82;
+}
+
+.appointment-details-highlight strong,
+.appointment-details-highlight span {
+  display: block;
+  text-transform: capitalize;
+}
+
+.appointment-details-highlight strong {
+  color: #264554;
+  font-size: 11px;
+}
+
+.appointment-details-highlight span {
+  margin-top: 3px;
+  color: #71878e;
+  font-size: 10px;
+}
+
+.appointment-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.appointment-details-grid > div {
+  min-width: 0;
+  border: 1px solid #e8eeee;
+  border-radius: 8px;
+  padding: 11px;
+}
+
+.appointment-details-grid dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #82949b;
+  font-size: 9px;
+}
+
+.appointment-details-grid dt svg {
+  width: 13px;
+  height: 13px;
+  color: #38a58e;
+}
+
+.appointment-details-grid dd {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  color: #294453;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.appointment-details-grid .appointment-details-notes {
+  grid-column: 1 / -1;
+}
+
+.appointment-details-grid .appointment-details-notes dd {
+  font-weight: 400;
+  line-height: 1.6;
+}
+
 @media (max-width: 760px) {
   .agenda-toolbar {
     padding: 11px;
@@ -292,5 +409,13 @@
 
   .agenda-day-grid.single-day {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .appointment-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .appointment-details-grid .appointment-details-notes {
+    grid-column: auto;
   }
 }

@@ -382,6 +382,54 @@
   padding-top: 16px;
 }
 
+.appointment-cancel-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border-top: 1px solid #e8eeee;
+  padding-top: 14px;
+}
+
+.appointment-cancel-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid #f3d7cf;
+  border-radius: 8px;
+  background: #fff7f4;
+  padding: 10px;
+}
+
+.appointment-cancel-warning svg {
+  width: 18px;
+  color: #bd5b4c;
+  flex: none;
+}
+
+.appointment-cancel-warning strong {
+  color: #774338;
+  font-size: 11px;
+}
+
+.appointment-cancel-warning p {
+  margin: 3px 0 0;
+  color: #8a6b64;
+  font-size: 10px;
+}
+
+.appointment-cancel-form textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.appointment-cancel-counter {
+  display: block;
+  margin-top: 4px;
+  color: #89979d;
+  font-size: 9px;
+  text-align: right;
+}
+
 .reschedule-picker {
   display: grid;
   grid-template-columns: minmax(250px, 1.1fr) minmax(210px, .9fr);

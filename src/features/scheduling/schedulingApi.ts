@@ -62,6 +62,10 @@ export type RescheduleAppointmentInput = {
   endsAt: string
 }
 
+export type CancelAppointmentInput = {
+  reason: string
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
 export async function getSchedulingOptions(): Promise<SchedulingOptions> {
@@ -190,6 +194,33 @@ export async function rescheduleAppointment(
   }
 
   if (!response.ok) return throwResponseError(response, 'Não foi possível reagendar o atendimento.')
+  return response.json() as Promise<CreatedAppointment>
+}
+
+export async function cancelAppointment(
+  appointmentId: string,
+  input: CancelAppointmentInput,
+): Promise<CreatedAppointment> {
+  let response: Response
+  try {
+    const csrf = await getCsrfToken()
+    response = await fetch(`${apiBaseUrl}/appointments/${appointmentId}/cancel`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        [csrf.headerName]: csrf.token,
+      },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de agenda.')
+  }
+
+  if (!response.ok) return throwResponseError(response, 'Não foi possível cancelar o atendimento.', {
+    409: 'Somente atendimentos ainda agendados podem ser cancelados.',
+  })
   return response.json() as Promise<CreatedAppointment>
 }
 

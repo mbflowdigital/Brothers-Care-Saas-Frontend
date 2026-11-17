@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, FileText, MapPin, Stethoscope, UserRound, X } from 'lucide-react'
 import { getPatientRegistrationOptions } from '../patients/patientApi'
+import { CancelAppointmentForm } from './CancelAppointmentForm'
 import { RescheduleAppointmentForm } from './RescheduleAppointmentForm'
 import './scheduling.css'
 import {
@@ -291,9 +292,9 @@ export function AppointmentAgendaPage({
             </div>}
     {selectedAppointment && <AppointmentDetailsDialog
       appointment={selectedAppointment}
-      canReschedule={viewerRole === 'professional'}
+      canManageAppointment={viewerRole === 'professional'}
       onClose={() => setSelectedAppointment(null)}
-      onRescheduled={() => {
+      onChanged={() => {
         setSelectedAppointment(null)
         setAppointmentsRetry((value) => value + 1)
       }}
@@ -431,18 +432,19 @@ function AgendaAppointment({
 
 function AppointmentDetailsDialog({
   appointment: initialAppointment,
-  canReschedule,
+  canManageAppointment,
   onClose,
-  onRescheduled,
+  onChanged,
 }: {
   appointment: AppointmentScheduleItem
-  canReschedule: boolean
+  canManageAppointment: boolean
   onClose: () => void
-  onRescheduled: () => void
+  onChanged: () => void
 }) {
   const [appointment, setAppointment] = useState(initialAppointment)
   const [error, setError] = useState('')
   const [rescheduling, setRescheduling] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -489,14 +491,21 @@ function AppointmentDetailsDialog({
           <div><dt><Clock3 />Duração</dt><dd>{appointment.durationMinutes} minutos</dd></div>
           <div className="appointment-details-notes"><dt><FileText />Observações</dt><dd>{appointment.notes || 'Nenhuma observação registrada.'}</dd></div>
         </dl>
-        {canReschedule && appointment.status === 'Scheduled' && (rescheduling
+        {canManageAppointment && appointment.status === 'Scheduled' && (rescheduling
           ? <RescheduleAppointmentForm
             appointment={appointment}
-            onCompleted={onRescheduled}
+            onCompleted={onChanged}
             onCancel={() => setRescheduling(false)}
           />
+          : cancelling
+            ? <CancelAppointmentForm
+              appointment={appointment}
+              onCompleted={onChanged}
+              onCancel={() => setCancelling(false)}
+            />
           : <div className="appointment-details-actions">
             <button type="button" className="button button-outline" onClick={() => setRescheduling(true)}>Reagendar</button>
+            <button type="button" className="button button-danger" onClick={() => setCancelling(true)}>Cancelar</button>
           </div>)}
       </div>
     </section>

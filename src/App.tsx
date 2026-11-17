@@ -4,7 +4,8 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-r
 import { Activity, AlertCircle, ArrowDownLeft, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardCheck, Command, FileClock, FileText, Filter, HeartPulse, Home, LayoutDashboard, Menu, MessageCircle, MoreHorizontal, PanelLeftClose, Plus, Search, Settings, Shield, Sparkles, Stethoscope, UserCog, UserRound, Users, Wallet, X } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { monthlyAppointments, patients, professionals } from './data'
-import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionPage, EvolutionTimeline, FinancePage, Modal, PlansPage, ReportsPage, SettingsPage } from './ExtraViews'
+import { AdminContent, AuditPage, CommandPalette, CommunicationPage, DocumentsPage, EvolutionTimeline, FinancePage, Modal, PlansPage, ReportsPage, SettingsPage } from './ExtraViews'
+import { ClinicalRecordsPage } from './features/clinical-records/ClinicalRecordsPage'
 import { AccountMenu } from './features/identity/AccountMenu'
 import { LoginPage, toUiSession, type AuthenticatedUiSession } from './features/identity/LoginPage'
 import { getCurrentSession, logout } from './features/identity/accountActionApi'
@@ -221,7 +222,7 @@ function ClinicContent({ path, session, activeTab, setActiveTab, query, setQuery
   if (path.startsWith('/app/pacientes/')) return <PatientDetail activeTab={activeTab} setActiveTab={setActiveTab} />
   if (path==='/app/profissionais') return <ProfessionalsManagementPage query={query} setQuery={setQuery}/>
   if (path.startsWith('/app/profissionais/')) return <ProfessionalDetail />
-  if (path==='/app/evolucoes'||path==='/app/minhas-evolucoes') return <EvolutionPage notify={notify} professional={session.profile==='professional'}/>
+  if (path==='/app/evolucoes'||path==='/app/minhas-evolucoes') return <ClinicalRecordsPage />
   if (path==='/app/financeiro') return <FinancePage notify={notify}/>
   if (path==='/app/comunicacao') return <CommunicationPage />
   if (path==='/app/auditoria') return <AuditPage />

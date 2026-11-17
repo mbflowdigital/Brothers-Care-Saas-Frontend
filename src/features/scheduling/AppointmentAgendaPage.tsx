@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, FileText, MapPin, Stethoscope, UserRound, X } from 'lucide-react'
 import { getPatientRegistrationOptions } from '../patients/patientApi'
 import './scheduling.css'
 import {
@@ -14,7 +14,7 @@ import {
   shiftAgendaDate,
   type AgendaView,
 } from './dateTime'
-import { getSchedulingOptions, listAppointments, type AppointmentScheduleItem } from './schedulingApi'
+import { getAppointment, getSchedulingOptions, listAppointments, type AppointmentScheduleItem } from './schedulingApi'
 
 type AgendaViewerRole = 'professional' | 'clinicAdministrator' | 'unsupported'
 type AgendaUnit = { id: string; name: string; timeZoneId: string }
@@ -55,6 +55,7 @@ export function AppointmentAgendaPage({
   const [appointmentsLoading, setAppointmentsLoading] = useState(false)
   const [appointmentsError, setAppointmentsError] = useState('')
   const [appointmentsRetry, setAppointmentsRetry] = useState(0)
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentScheduleItem | null>(null)
 
   useEffect(() => {
     let active = true
@@ -267,6 +268,7 @@ export function AppointmentAgendaPage({
             appointmentsByDate={appointmentsByDate}
             timeZoneId={selectedUnit?.timeZoneId ?? 'UTC'}
             showProfessional={viewerRole === 'clinicAdministrator'}
+            onSelect={setSelectedAppointment}
           />
           : view === 'list'
             ? <ListCalendar
@@ -274,6 +276,7 @@ export function AppointmentAgendaPage({
               appointmentsByDate={appointmentsByDate}
               timeZoneId={selectedUnit?.timeZoneId ?? 'UTC'}
               showProfessional={viewerRole === 'clinicAdministrator'}
+              onSelect={setSelectedAppointment}
             />
             : <div className={`agenda-day-grid ${view === 'day' ? 'single-day' : ''}`}>
               {visibleDates.map((date) => <DayColumn
@@ -282,8 +285,13 @@ export function AppointmentAgendaPage({
                 appointments={appointmentsByDate.get(date) ?? []}
                 timeZoneId={selectedUnit?.timeZoneId ?? 'UTC'}
                 showProfessional={viewerRole === 'clinicAdministrator'}
+                onSelect={setSelectedAppointment}
               />)}
             </div>}
+    {selectedAppointment && <AppointmentDetailsDialog
+      appointment={selectedAppointment}
+      onClose={() => setSelectedAppointment(null)}
+    />}
   </section>
 }
 
@@ -293,12 +301,14 @@ function MonthCalendar({
   appointmentsByDate,
   timeZoneId,
   showProfessional,
+  onSelect,
 }: {
   dates: string[]
   selectedDate: string
   appointmentsByDate: Map<string, AppointmentScheduleItem[]>
   timeZoneId: string
   showProfessional: boolean
+  onSelect: (appointment: AppointmentScheduleItem) => void
 }) {
   return <div className="agenda-month card">
     <div className="agenda-month-weekdays">
@@ -316,6 +326,7 @@ function MonthCalendar({
             timeZoneId={timeZoneId}
             showProfessional={showProfessional}
             compact
+            onSelect={onSelect}
           />)}
           {items.length > 2 && <small className="agenda-more">+{items.length - 2} atendimentos</small>}
         </div>
@@ -329,11 +340,13 @@ function ListCalendar({
   appointmentsByDate,
   timeZoneId,
   showProfessional,
+  onSelect,
 }: {
   dates: string[]
   appointmentsByDate: Map<string, AppointmentScheduleItem[]>
   timeZoneId: string
   showProfessional: boolean
+  onSelect: (appointment: AppointmentScheduleItem) => void
 }) {
   const hasAppointments = dates.some((date) => (appointmentsByDate.get(date)?.length ?? 0) > 0)
   if (!hasAppointments) return <div className="card empty-state"><p>Nenhum agendamento neste período.</p></div>
@@ -348,6 +361,7 @@ function ListCalendar({
           appointment={appointment}
           timeZoneId={timeZoneId}
           showProfessional={showProfessional}
+          onSelect={onSelect}
         />)}
       </section>
     })}
@@ -359,11 +373,13 @@ function DayColumn({
   appointments,
   timeZoneId,
   showProfessional,
+  onSelect,
 }: {
   date: string
   appointments: AppointmentScheduleItem[]
   timeZoneId: string
   showProfessional: boolean
+  onSelect: (appointment: AppointmentScheduleItem) => void
 }) {
   return <section className="agenda-day-column card">
     <h3>{formatAgendaDate(date, { weekday: 'short', day: '2-digit', month: '2-digit' })}</h3>
@@ -374,6 +390,7 @@ function DayColumn({
         appointment={appointment}
         timeZoneId={timeZoneId}
         showProfessional={showProfessional}
+        onSelect={onSelect}
       />)}
   </section>
 }
@@ -383,20 +400,97 @@ function AgendaAppointment({
   timeZoneId,
   showProfessional,
   compact = false,
+  onSelect,
 }: {
   appointment: AppointmentScheduleItem
   timeZoneId: string
   showProfessional: boolean
   compact?: boolean
+  onSelect: (appointment: AppointmentScheduleItem) => void
 }) {
   const statusLabel = statusLabels[appointment.status] ?? appointment.status
-  return <article className={`agenda-appointment ${compact ? 'compact' : ''}`}>
+  return <button
+    type="button"
+    className={`agenda-appointment ${compact ? 'compact' : ''}`}
+    onClick={() => onSelect(appointment)}
+    aria-label={`Ver agendamento de ${appointment.patientName}`}
+  >
     <time>{formatAppointmentTimeRange(appointment.startsAt, appointment.endsAt, timeZoneId)}</time>
     <strong>{appointment.patientName}</strong>
     {showProfessional && <span>{appointment.professionalName}</span>}
     {!compact && <span>{appointment.clinicUnitName}</span>}
     <small className={`agenda-status status-${appointment.status.toLowerCase()}`}>{statusLabel}</small>
-  </article>
+  </button>
+}
+
+function AppointmentDetailsDialog({
+  appointment: initialAppointment,
+  onClose,
+}: {
+  appointment: AppointmentScheduleItem
+  onClose: () => void
+}) {
+  const [appointment, setAppointment] = useState(initialAppointment)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    getAppointment(initialAppointment.id)
+      .then((result) => { if (active) setAppointment(result) })
+      .catch((caught: unknown) => {
+        if (active) setError(caught instanceof Error ? caught.message : 'Não foi possível atualizar os detalhes.')
+      })
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      active = false
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [initialAppointment.id, onClose])
+
+  const timeZoneId = appointment.timeZoneId || 'UTC'
+  const statusLabel = statusLabels[appointment.status] ?? appointment.status
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+    if (event.target === event.currentTarget) onClose()
+  }}>
+    <section className="modal appointment-details-modal" role="dialog" aria-modal="true" aria-labelledby="appointment-details-title">
+      <header className="modal-head">
+        <div>
+          <small>Detalhes do atendimento</small>
+          <h2 id="appointment-details-title">{appointment.patientName}</h2>
+        </div>
+        <button type="button" className="icon-button" onClick={onClose} aria-label="Fechar detalhes"><X /></button>
+      </header>
+      <div className="modal-body appointment-details-body">
+        {error && <p className="appointment-details-warning" role="alert">{error}</p>}
+        <div className="appointment-details-highlight">
+          <CalendarDays />
+          <div>
+            <strong>{formatDateTime(appointment.startsAt, timeZoneId)}</strong>
+            <span>{formatAppointmentTimeRange(appointment.startsAt, appointment.endsAt, timeZoneId)}</span>
+          </div>
+          <small className={`agenda-status status-${appointment.status.toLowerCase()}`}>{statusLabel}</small>
+        </div>
+        <dl className="appointment-details-grid">
+          <div><dt><UserRound />Paciente</dt><dd>{appointment.patientName}</dd></div>
+          <div><dt><Stethoscope />Profissional</dt><dd>{appointment.professionalName}</dd></div>
+          <div><dt><MapPin />Unidade</dt><dd>{appointment.clinicUnitName}</dd></div>
+          <div><dt><Clock3 />Duração</dt><dd>{appointment.durationMinutes} minutos</dd></div>
+          <div className="appointment-details-notes"><dt><FileText />Observações</dt><dd>{appointment.notes || 'Nenhuma observação registrada.'}</dd></div>
+        </dl>
+      </div>
+    </section>
+  </div>
+}
+
+function formatDateTime(value: string, timeZoneId: string): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: timeZoneId,
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(value))
 }
 
 function formatRangeLabel(view: AgendaView, selectedDate: string, fromDate: string, toExclusiveDate: string): string {

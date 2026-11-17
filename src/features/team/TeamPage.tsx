@@ -12,7 +12,7 @@ const statusCopy = { Active: 'Ativo', Invited: 'Convite enviado', Suspended: 'Su
 const empty: InviteTeamMember = { displayName: '', email: '', role: 'Professional', clinicUnitIds: [], performsCare: true, specialty: '', councilType: '', registrationNumber: '', councilState: '' }
 
 function formFromMember(member: TeamMember): InviteTeamMember {
-  return { displayName: member.displayName, email: member.email, role: member.role, clinicUnitIds: member.units.map((unit) => unit.id), performsCare: member.performsCare, specialty: member.specialty ?? '', councilType: member.councilType ?? '', registrationNumber: member.registrationNumber ?? '', councilState: member.councilState ?? '', defaultAppointmentDurationMinutes: member.defaultAppointmentDurationMinutes }
+  return { displayName: member.displayName, email: member.email, role: member.role, clinicUnitIds: member.units.map((unit) => unit.id), performsCare: member.role === 'Professional' || member.performsCare, specialty: member.specialty ?? '', councilType: member.councilType ?? '', registrationNumber: member.registrationNumber ?? '', councilState: member.councilState ?? '', defaultAppointmentDurationMinutes: member.defaultAppointmentDurationMinutes }
 }
 
 export function TeamPage() {

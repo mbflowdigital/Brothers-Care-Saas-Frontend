@@ -140,6 +140,28 @@ export async function listAppointments(input: ListAppointmentsInput): Promise<Ap
   return response.json() as Promise<AppointmentScheduleItem[]>
 }
 
+export async function getAppointment(appointmentId: string): Promise<AppointmentScheduleItem> {
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/appointments/${appointmentId}`, {
+      credentials: 'include',
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de agenda.')
+  }
+
+  if (!response.ok) return throwResponseError(
+    response,
+    'Não foi possível carregar os detalhes do agendamento.',
+    {
+      403: 'Você não tem acesso a este agendamento.',
+      404: 'Agendamento não encontrado.',
+    },
+  )
+  return response.json() as Promise<AppointmentScheduleItem>
+}
+
 async function getCsrfToken(): Promise<{ token: string; headerName: string }> {
   const response = await fetch(`${apiBaseUrl}/auth/csrf-token`, {
     credentials: 'include',

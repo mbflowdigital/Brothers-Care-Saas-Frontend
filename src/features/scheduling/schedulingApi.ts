@@ -13,9 +13,46 @@ export type SchedulingClinicUnitOption = {
 }
 
 export type SchedulingOptions = {
+  professionalId: string
   patients: SchedulingPatientOption[]
   clinicUnits: SchedulingClinicUnitOption[]
   defaultAppointmentDurationMinutes: number | null
+}
+
+export type ProfessionalAvailability = {
+  professionalId: string
+  clinicUnitId: string
+  timeZoneId: string
+  isScheduleConfigured: boolean
+  weeklyWindows: Array<{
+    id: string
+    clinicUnitId: string
+    dayOfWeek: number
+    startsAt: string
+    endsAt: string
+  }>
+  blocks: ProfessionalAvailabilityBlock[]
+}
+
+export type ProfessionalAvailabilityBlock = {
+  id: string
+  startsAt: string
+  endsAt: string
+  kind: 'Blocked' | 'Vacation'
+  reason: string | null
+}
+
+export type WeeklyAvailabilityWindowInput = {
+  dayOfWeek: number
+  startsAt: string
+  endsAt: string
+}
+
+export type CreateAvailabilityBlockInput = {
+  startsAt: string
+  endsAt: string
+  kind: ProfessionalAvailabilityBlock['kind']
+  reason: string | null
 }
 
 export type AppointmentScheduleItem = {
@@ -54,6 +91,16 @@ export type CreatedAppointment = {
   notes: string | null
   status: string
   createdAt: string
+}
+
+export type RescheduleAppointmentInput = {
+  clinicUnitId: string
+  startsAt: string
+  endsAt: string
+}
+
+export type CancelAppointmentInput = {
+  reason: string
 }
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
@@ -140,6 +187,140 @@ export async function listAppointments(input: ListAppointmentsInput): Promise<Ap
   return response.json() as Promise<AppointmentScheduleItem[]>
 }
 
+export async function getProfessionalAvailability(
+  professionalId: string,
+  clinicUnitId: string,
+): Promise<ProfessionalAvailability> {
+  const now = new Date()
+  const parameters = new URLSearchParams({
+    clinicUnitId,
+    from: now.toISOString(),
+    through: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+  })
+  let response: Response
+  try {
+    response = await fetch(
+      `${apiBaseUrl}/professionals/${professionalId}/availability?${parameters}`,
+      { credentials: 'include', signal: AbortSignal.timeout(15000) },
+    )
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de disponibilidade.')
+  }
+
+  if (!response.ok) return throwResponseError(
+    response,
+    'Não foi possível carregar a disponibilidade.',
+    {
+      403: 'Você não tem permissão para consultar a disponibilidade deste profissional.',
+      404: 'O profissional ou a unidade não foi encontrado nesta empresa.',
+    },
+  )
+  return response.json() as Promise<ProfessionalAvailability>
+}
+
+export async function setProfessionalWeeklyAvailability(
+  professionalId: string,
+  clinicUnitId: string,
+  windows: WeeklyAvailabilityWindowInput[],
+): Promise<void> {
+  let response: Response
+  try {
+    const csrf = await getCsrfToken()
+    response = await fetch(
+      `${apiBaseUrl}/professionals/${professionalId}/availability/weekly`,
+      {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          [csrf.headerName]: csrf.token,
+        },
+        body: JSON.stringify({ clinicUnitId, windows }),
+        signal: AbortSignal.timeout(15000),
+      },
+    )
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de disponibilidade.')
+  }
+
+  if (!response.ok) return throwResponseError(
+    response,
+    'Não foi possível salvar a jornada semanal.',
+    {
+      400: 'Confira os horários. Eles devem ser válidos e não podem se sobrepor no mesmo dia.',
+      403: 'Você não tem permissão para alterar a disponibilidade deste profissional.',
+      404: 'O profissional ou a unidade não foi encontrado nesta empresa.',
+    },
+  )
+}
+
+export async function createProfessionalAvailabilityBlock(
+  professionalId: string,
+  input: CreateAvailabilityBlockInput,
+): Promise<ProfessionalAvailabilityBlock> {
+  let response: Response
+  try {
+    const csrf = await getCsrfToken()
+    response = await fetch(
+      `${apiBaseUrl}/professionals/${professionalId}/availability/blocks`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          [csrf.headerName]: csrf.token,
+        },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(15000),
+      },
+    )
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de disponibilidade.')
+  }
+
+  if (!response.ok) return throwResponseError(
+    response,
+    'Não foi possível criar o bloqueio.',
+    {
+      400: 'Informe um período válido, com término posterior ao início.',
+      403: 'Você não tem permissão para bloquear a disponibilidade deste profissional.',
+      404: 'O profissional não foi encontrado nesta empresa.',
+      409: 'Não é possível bloquear o período porque há atendimentos agendados.',
+    },
+  )
+  return response.json() as Promise<ProfessionalAvailabilityBlock>
+}
+
+export async function deleteProfessionalAvailabilityBlock(
+  professionalId: string,
+  blockId: string,
+): Promise<void> {
+  let response: Response
+  try {
+    const csrf = await getCsrfToken()
+    response = await fetch(
+      `${apiBaseUrl}/professionals/${professionalId}/availability/blocks/${blockId}`,
+      {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { [csrf.headerName]: csrf.token },
+        signal: AbortSignal.timeout(15000),
+      },
+    )
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de disponibilidade.')
+  }
+
+  if (!response.ok) return throwResponseError(
+    response,
+    'Não foi possível remover o bloqueio.',
+    {
+      403: 'Você não tem permissão para remover este bloqueio.',
+      404: 'O bloqueio não foi encontrado nesta empresa.',
+    },
+  )
+}
+
 export async function getAppointment(appointmentId: string): Promise<AppointmentScheduleItem> {
   let response: Response
   try {
@@ -160,6 +341,97 @@ export async function getAppointment(appointmentId: string): Promise<Appointment
     },
   )
   return response.json() as Promise<AppointmentScheduleItem>
+}
+
+export async function rescheduleAppointment(
+  appointmentId: string,
+  input: RescheduleAppointmentInput,
+): Promise<CreatedAppointment> {
+  let response: Response
+  try {
+    const csrf = await getCsrfToken()
+    response = await fetch(`${apiBaseUrl}/appointments/${appointmentId}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        [csrf.headerName]: csrf.token,
+      },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de agenda.')
+  }
+
+  if (!response.ok) return throwResponseError(response, 'Não foi possível reagendar o atendimento.')
+  return response.json() as Promise<CreatedAppointment>
+}
+
+export async function cancelAppointment(
+  appointmentId: string,
+  input: CancelAppointmentInput,
+): Promise<CreatedAppointment> {
+  let response: Response
+  try {
+    const csrf = await getCsrfToken()
+    response = await fetch(`${apiBaseUrl}/appointments/${appointmentId}/cancel`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        [csrf.headerName]: csrf.token,
+      },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de agenda.')
+  }
+
+  if (!response.ok) return throwResponseError(response, 'Não foi possível cancelar o atendimento.', {
+    409: 'Somente atendimentos ainda agendados podem ser cancelados.',
+  })
+  return response.json() as Promise<CreatedAppointment>
+}
+
+export async function completeAppointment(appointmentId: string): Promise<CreatedAppointment> {
+  return postAppointmentAction(appointmentId, 'complete')
+}
+
+export async function markAppointmentNoShow(
+  appointmentId: string,
+  input: CancelAppointmentInput,
+): Promise<CreatedAppointment> {
+  return postAppointmentAction(appointmentId, 'no-show', input)
+}
+
+async function postAppointmentAction(
+  appointmentId: string,
+  action: 'complete' | 'no-show',
+  input?: unknown,
+): Promise<CreatedAppointment> {
+  let response: Response
+  try {
+    const csrf = await getCsrfToken()
+    response = await fetch(`${apiBaseUrl}/appointments/${appointmentId}/${action}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        [csrf.headerName]: csrf.token,
+      },
+      body: input ? JSON.stringify(input) : undefined,
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de agenda.')
+  }
+
+  if (!response.ok) return throwResponseError(response, 'Não foi possível atualizar o atendimento.', {
+    409: 'Esta ação só está disponível após o início de um atendimento ainda agendado.',
+  })
+  return response.json() as Promise<CreatedAppointment>
 }
 
 async function getCsrfToken(): Promise<{ token: string; headerName: string }> {

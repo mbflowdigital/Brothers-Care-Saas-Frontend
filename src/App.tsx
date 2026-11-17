@@ -14,6 +14,7 @@ import { deactivatePatient, listPatients, type PatientListItem } from './feature
 import { ProfessionalsManagementPage } from './features/professionals/ProfessionalsManagementPage'
 import { AppointmentAgendaPage } from './features/scheduling/AppointmentAgendaPage'
 import { CreateAppointmentForm } from './features/scheduling/CreateAppointmentForm'
+import { ProfessionalAvailabilityPage } from './features/scheduling/ProfessionalAvailabilityPage'
 import { TeamPage, WelcomeTeamCard } from './features/team/TeamPage'
 import { ClinicGettingStarted, getWorkspaceSummary, type WorkspaceSummary } from './features/workspace/ClinicGettingStarted'
 
@@ -33,16 +34,16 @@ type OpenModal = (modal: ModalRequest | null) => void
 const clinicPath = '/app/dashboard'
 const routeLabels: Record<string, string> = {
   '/admin/pre-cadastros': 'Pré-cadastros',
-  '/app/dashboard': 'Visão geral', '/app/agenda': 'Agenda', '/app/pacientes': 'Pacientes', '/app/profissionais': 'Profissionais', '/app/atendimentos': 'Atendimentos', '/app/evolucoes': 'Evoluções', '/app/financeiro': 'Financeiro', '/app/convenios': 'Convênios', '/app/comunicacao': 'Comunicação', '/app/relatorios': 'Relatórios', '/app/auditoria': 'Auditoria', '/app/usuarios': 'Usuários', '/app/configuracoes': 'Configurações', '/app/minha-agenda': 'Minha agenda', '/app/meus-pacientes': 'Meus pacientes', '/app/meus-atendimentos': 'Atendimentos', '/app/minhas-evolucoes': 'Evoluções', '/app/documentos': 'Documentos', '/admin': 'Visão geral', '/admin/empresas': 'Empresas', '/admin/assinaturas': 'Assinaturas', '/admin/planos': 'Planos', '/admin/tickets': 'Tickets', '/admin/atividade': 'Atividade global',
+  '/app/dashboard': 'Visão geral', '/app/agenda': 'Agenda', '/app/pacientes': 'Pacientes', '/app/profissionais': 'Profissionais', '/app/atendimentos': 'Atendimentos', '/app/evolucoes': 'Evoluções', '/app/financeiro': 'Financeiro', '/app/convenios': 'Convênios', '/app/comunicacao': 'Comunicação', '/app/relatorios': 'Relatórios', '/app/auditoria': 'Auditoria', '/app/usuarios': 'Usuários', '/app/configuracoes': 'Configurações', '/app/minha-agenda': 'Minha agenda', '/app/minha-disponibilidade': 'Minha disponibilidade', '/app/disponibilidade': 'Disponibilidade', '/app/meus-pacientes': 'Meus pacientes', '/app/meus-atendimentos': 'Atendimentos', '/app/minhas-evolucoes': 'Evoluções', '/app/documentos': 'Documentos', '/admin': 'Visão geral', '/admin/empresas': 'Empresas', '/admin/assinaturas': 'Assinaturas', '/admin/planos': 'Planos', '/admin/tickets': 'Tickets', '/admin/atividade': 'Atividade global',
 }
 const clinicalNav = [
   { label: 'VISÃO GERAL', items: [['/app/dashboard', 'Visão geral', LayoutDashboard]] },
-  { label: 'OPERAÇÃO CLÍNICA', items: [['/app/agenda', 'Agenda', CalendarDays], ['/app/pacientes', 'Pacientes', Users], ['/app/profissionais', 'Profissionais', Stethoscope]] },
+  { label: 'OPERAÇÃO CLÍNICA', items: [['/app/agenda', 'Agenda', CalendarDays], ['/app/pacientes', 'Pacientes', Users], ['/app/profissionais', 'Profissionais', Stethoscope], ['/app/disponibilidade', 'Disponibilidade', CalendarDays]] },
   { label: 'GESTÃO', items: [['/app/usuarios', 'Usuários', UserCog]] },
   { label: 'SISTEMA', items: [['/app/configuracoes', 'Configurações', Settings]] },
 ]
 const professionalNav = [
-  { label: 'ESPAÇO DE TRABALHO', items: [['/app/minha-agenda', 'Minha agenda', CalendarDays], ['/app/meus-pacientes', 'Meus pacientes', Users], ['/app/meus-atendimentos', 'Atendimentos', ClipboardCheck], ['/app/minhas-evolucoes', 'Evoluções', FileText], ['/app/documentos', 'Documentos', FileClock]] },
+  { label: 'ESPAÇO DE TRABALHO', items: [['/app/minha-agenda', 'Minha agenda', CalendarDays], ['/app/minha-disponibilidade', 'Minha disponibilidade', CalendarDays], ['/app/meus-pacientes', 'Meus pacientes', Users], ['/app/meus-atendimentos', 'Atendimentos', ClipboardCheck], ['/app/minhas-evolucoes', 'Evoluções', FileText], ['/app/documentos', 'Documentos', FileClock]] },
 ]
 const adminNav = [
   { label: 'BROTHERS CARE', items: [['/admin', 'Visão geral', LayoutDashboard], ['/admin/pre-cadastros', 'Pré-cadastros', FileClock]] },
@@ -157,6 +158,8 @@ function Workspace({ session, onLogout, notify, openModal, appointmentsRevision 
   const navigate = useNavigate()
   const isAdmin = session.profile === 'admin'
   const isProfessional = session.profile === 'professional'
+  const membershipRole = session.memberships.find((item) => item.tenantId === session.tenantId)?.role
+  const isClinicAdministrator = membershipRole === 'ClinicAdministrator'
   const tenantName = session.tenantName || 'Sua clínica'
   const tenantInitials = tenantName.split(' ').filter(Boolean).map((part) => part[0]).slice(0, 2).join('').toUpperCase()
   const [collapsed, setCollapsed] = useState(false)
@@ -165,8 +168,8 @@ function Workspace({ session, onLogout, notify, openModal, appointmentsRevision 
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const path = location.pathname
-  const navGroups = isAdmin ? adminNav : isProfessional ? professionalNav : clinicalNav
-  const allowed = isAdmin ? path.startsWith('/admin') : isProfessional ? ['/app/minha-agenda','/app/meus-pacientes','/app/meus-atendimentos','/app/minhas-evolucoes','/app/documentos'].includes(path) : path.startsWith('/app/')
+  const navGroups = isAdmin ? adminNav : isProfessional ? professionalNav : isClinicAdministrator ? clinicalNav : clinicalNav.map((group) => ({ ...group, items: group.items.filter(([href]) => href !== '/app/disponibilidade') }))
+  const allowed = isAdmin ? path.startsWith('/admin') : isProfessional ? ['/app/minha-agenda','/app/minha-disponibilidade','/app/meus-pacientes','/app/meus-atendimentos','/app/minhas-evolucoes','/app/documentos'].includes(path) : path.startsWith('/app/')
   useEffect(() => { if (!allowed) navigate(isAdmin ? '/admin' : isProfessional ? '/app/minha-agenda' : clinicPath, { replace: true }) }, [allowed, isAdmin, isProfessional, navigate])
   useEffect(() => {
     setLoading(true)
@@ -188,11 +191,13 @@ function Workspace({ session, onLogout, notify, openModal, appointmentsRevision 
 function PageHeading({ title, path, tenantName, notify, openModal, professional }: { title: string; path: string; tenantName: string; notify: (text: string) => void; openModal: OpenModal; professional: boolean }) {
   const isDashboard = path === clinicPath || path === '/admin'
   const isAgenda = path.includes('agenda')
+  const isAvailability = path.includes('disponibilidade')
   const isEvolution = path.includes('evolu')
   const isPatientProfile = path.startsWith('/app/pacientes/')
-  const subtitle = path === '/admin/pre-cadastros' ? 'Acompanhe convites e cadastros pendentes das clínicas.' : isDashboard ? path === '/admin' ? 'Acompanhe a saúde de toda a operação Brothers Care.' : `Uma visão clara da operação de ${tenantName}.` : isAgenda ? 'Organize atendimentos, equipe e rotina em um só lugar.' : isEvolution ? 'Registros clínicos organizados para acompanhar cada conquista.' : isPatientProfile ? 'Histórico e informações do cuidado em um só lugar.' : `Gerencie ${title.toLocaleLowerCase('pt-BR')} de ${tenantName}.`
+  const subtitle = isAvailability ? professional ? 'Configure sua jornada semanal e seus períodos de bloqueio ou férias.' : 'Gerencie as jornadas e os períodos de bloqueio ou férias dos profissionais.' : path === '/admin/pre-cadastros' ? 'Acompanhe convites e cadastros pendentes das clínicas.' : isDashboard ? path === '/admin' ? 'Acompanhe a saúde de toda a operação Brothers Care.' : `Uma visão clara da operação de ${tenantName}.` : isAgenda ? 'Organize atendimentos, equipe e rotina em um só lugar.' : isEvolution ? 'Registros clínicos organizados para acompanhar cada conquista.' : isPatientProfile ? 'Histórico e informações do cuidado em um só lugar.' : `Gerencie ${title.toLocaleLowerCase('pt-BR')} de ${tenantName}.`
   let action: ReactNode = <button className="button button-outline" onClick={() => notify('Relatório preparado para exportação.')}><ArrowDownLeft />Exportar</button>
   if (path === '/admin' || path === '/admin/pre-cadastros') action = null
+  else if (isAvailability) action = null
   else if (path === '/app/minha-agenda' && professional) action = <button className="button button-primary" onClick={() => openModal({ title: 'Novo agendamento', content: '', kind: 'appointment' })}><Plus />Novo agendamento</button>
   else if (isAgenda) action = null
   else if (isDashboard) action = <button className="button button-primary" onClick={() => openModal({ title: 'Novo atendimento', content: 'Selecione paciente, profissional, modalidade e horário para adicionar um atendimento à agenda.' })}><Plus />Novo atendimento</button>
@@ -209,6 +214,13 @@ function Kpi({ label, value, note, icon: Icon, tone = 'teal' }: { label: string;
 function ClinicContent({ path, session, activeTab, setActiveTab, query, setQuery, notify, appointmentsRevision }: { path: string; session: Session; activeTab: string; setActiveTab: (tab: string) => void; query: string; setQuery: (query: string) => void; notify: (text: string) => void; appointmentsRevision: number }) {
   if (path===clinicPath) return <><WelcomeTeamCard tenantName={session.tenantName}/><ClinicDashboard notify={notify}/></>
   if (path==='/app/minha-agenda') return <AppointmentAgendaPage viewerRole="professional" appointmentsRevision={appointmentsRevision}/>
+  if (path === '/app/minha-disponibilidade') return <ProfessionalAvailabilityPage viewerRole="professional"/>
+  if (path === '/app/disponibilidade') {
+    const membershipRole = session.memberships.find((item) => item.tenantId === session.tenantId)?.role
+    return membershipRole === 'ClinicAdministrator'
+      ? <ProfessionalAvailabilityPage viewerRole="clinicAdministrator"/>
+      : <div className="card availability-card" role="alert">Você não tem permissão para gerenciar a disponibilidade dos profissionais.</div>
+  }
   if (path==='/app/agenda'||path==='/app/meus-atendimentos') {
     const membershipRole = session.memberships.find((item) => item.tenantId === session.tenantId)?.role
     const viewerRole = session.profile === 'professional'

@@ -8,7 +8,7 @@ Este documento separa o estado executável atual da arquitetura recomendada para
 - Rotas, shell, páginas e parte da lógica estão concentrados em `src/App.tsx` e `src/ExtraViews.tsx`.
 - `src/data.ts` contém modelos e dados de apresentação.
 - A identidade usa endpoints HTTP e cookies de sessão; pacientes e agenda possuem integrações HTTP parciais.
-- Profissionais consultam a própria agenda e criam agendamentos por API. Administradores da clínica consultam a agenda do tenant ativo, filtram por profissional e unidade e usam o fuso da unidade selecionada; indicadores e outros módulos ainda usam dados de apresentação.
+- Profissionais consultam a própria agenda, criam agendamentos e gerenciam sua disponibilidade por API. Administradores da clínica consultam a agenda do tenant ativo, filtram por profissional e unidade e gerenciam a disponibilidade das pessoas vinculadas ao tenant. A jornada semanal usa o fuso da unidade selecionada; bloqueios valem para todas as unidades. Indicadores e outros módulos ainda usam dados de apresentação.
 - Ainda há fluxos de demonstração com estado local; sua existência não substitui autenticação nem autorização no backend.
 
 O frontend permanece híbrido e incompleto; não deve receber informação clínica real nem ser exposto como sistema de produção.

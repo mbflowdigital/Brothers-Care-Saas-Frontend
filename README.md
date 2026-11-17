@@ -57,6 +57,8 @@ O Brothers Care reúne a operação diária de uma clínica multidisciplinar: pa
 | `/app/dashboard` | Visão geral da clínica |
 | `/app/agenda` | Agenda e atendimentos |
 | `/app/minha-agenda` | Agenda do profissional |
+| `/app/disponibilidade` | Jornada e bloqueios (administrador da clínica) |
+| `/app/minha-disponibilidade` | Jornada e bloqueios do profissional |
 | `/app/pacientes` | Pacientes e perfis individuais |
 | `/app/profissionais` | Equipe e perfis profissionais |
 | `/app/evolucoes` | Registro e histórico clínico de demonstração |
@@ -94,7 +96,7 @@ As rotas internas exigem uma sessão válida. O frontend usa cookies para a sess
 
 **Stack:** React 19, TypeScript, Vite, React Router, Tailwind CSS, Recharts e Lucide.
 
-**Fluxo atual:** a integração é parcial. Login/sessão, alguns cadastros e a agenda usam a API. Profissionais consultam sua própria agenda e podem criar agendamentos; administradores da clínica consultam o tenant ativo e filtram por profissional e unidade. As visualizações dia, semana, mês e lista usam o fuso da unidade selecionada. Outros módulos e indicadores ainda usam dados de demonstração, alguns mantidos no `localStorage`. O backend precisa estar configurado e conectado ao banco para testar fluxos persistidos. Não use dados clínicos reais nesta aplicação.
+**Fluxo atual:** a integração é parcial. Login/sessão, alguns cadastros, agenda e disponibilidade usam a API. Profissionais consultam sua própria agenda, criam agendamentos e gerenciam a própria disponibilidade; administradores da clínica consultam o tenant ativo e podem gerenciar profissionais e unidades vinculadas. A jornada semanal usa o fuso da unidade selecionada; bloqueios e férias são globais para o profissional. Outros módulos e indicadores ainda usam dados de demonstração, alguns mantidos no `localStorage`. O backend precisa estar configurado e conectado ao banco para testar fluxos persistidos. Não use dados clínicos reais nesta aplicação.
 
 ## Direção de arquitetura
 

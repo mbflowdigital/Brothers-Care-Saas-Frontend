@@ -463,7 +463,7 @@ async function throwResponseError(
         : response.status === 409
           ? 'Esse horário conflita com outro atendimento. Escolha outro horário.'
           : response.status === 422
-            ? 'O atendimento não pode começar no passado.'
+              ? problem?.detail ?? problem?.title ?? fallback
             : response.status === 400
               ? problem?.detail ?? 'Confira os dados informados e tente novamente.'
               : problem?.detail ?? problem?.title ?? fallback

@@ -56,6 +56,12 @@ export type CreatedAppointment = {
   createdAt: string
 }
 
+export type RescheduleAppointmentInput = {
+  clinicUnitId: string
+  startsAt: string
+  endsAt: string
+}
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
 export async function getSchedulingOptions(): Promise<SchedulingOptions> {
@@ -160,6 +166,31 @@ export async function getAppointment(appointmentId: string): Promise<Appointment
     },
   )
   return response.json() as Promise<AppointmentScheduleItem>
+}
+
+export async function rescheduleAppointment(
+  appointmentId: string,
+  input: RescheduleAppointmentInput,
+): Promise<CreatedAppointment> {
+  let response: Response
+  try {
+    const csrf = await getCsrfToken()
+    response = await fetch(`${apiBaseUrl}/appointments/${appointmentId}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        [csrf.headerName]: csrf.token,
+      },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível conectar ao serviço de agenda.')
+  }
+
+  if (!response.ok) return throwResponseError(response, 'Não foi possível reagendar o atendimento.')
+  return response.json() as Promise<CreatedAppointment>
 }
 
 async function getCsrfToken(): Promise<{ token: string; headerName: string }> {

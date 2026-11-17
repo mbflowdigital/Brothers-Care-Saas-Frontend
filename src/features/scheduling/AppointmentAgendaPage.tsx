@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, FileText, MapPin, Stethoscope, UserRound, X } from 'lucide-react'
 import { getPatientRegistrationOptions } from '../patients/patientApi'
+import { RescheduleAppointmentForm } from './RescheduleAppointmentForm'
 import './scheduling.css'
 import {
   formatAgendaDate,
@@ -290,7 +291,12 @@ export function AppointmentAgendaPage({
             </div>}
     {selectedAppointment && <AppointmentDetailsDialog
       appointment={selectedAppointment}
+      canReschedule={viewerRole === 'professional'}
       onClose={() => setSelectedAppointment(null)}
+      onRescheduled={() => {
+        setSelectedAppointment(null)
+        setAppointmentsRetry((value) => value + 1)
+      }}
     />}
   </section>
 }
@@ -425,13 +431,18 @@ function AgendaAppointment({
 
 function AppointmentDetailsDialog({
   appointment: initialAppointment,
+  canReschedule,
   onClose,
+  onRescheduled,
 }: {
   appointment: AppointmentScheduleItem
+  canReschedule: boolean
   onClose: () => void
+  onRescheduled: () => void
 }) {
   const [appointment, setAppointment] = useState(initialAppointment)
   const [error, setError] = useState('')
+  const [rescheduling, setRescheduling] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -478,6 +489,15 @@ function AppointmentDetailsDialog({
           <div><dt><Clock3 />Duração</dt><dd>{appointment.durationMinutes} minutos</dd></div>
           <div className="appointment-details-notes"><dt><FileText />Observações</dt><dd>{appointment.notes || 'Nenhuma observação registrada.'}</dd></div>
         </dl>
+        {canReschedule && appointment.status === 'Scheduled' && (rescheduling
+          ? <RescheduleAppointmentForm
+            appointment={appointment}
+            onCompleted={onRescheduled}
+            onCancel={() => setRescheduling(false)}
+          />
+          : <div className="appointment-details-actions">
+            <button type="button" className="button button-outline" onClick={() => setRescheduling(true)}>Reagendar</button>
+          </div>)}
       </div>
     </section>
   </div>

@@ -138,6 +138,11 @@ export function getAppointmentDate(startsAt: string, timeZone: string): string {
   return getTodayInTimeZone(timeZone, new Date(startsAt))
 }
 
+export function offsetIsoToLocalDateTime(value: string, timeZone: string): string {
+  const parts = readParts(getFormatter(timeZone), new Date(value).getTime())
+  return `${formatLocalDate(parts)}T${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`
+}
+
 export function addMinutesToLocalDateTime(value: string, minutes: number): string {
   const parts = parseLocalDateTime(value)
   const wallTime = wallClockMilliseconds(parts, 0) + minutes * 60 * 1000

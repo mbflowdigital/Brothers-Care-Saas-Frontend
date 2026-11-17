@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CalendarCheck2, CalendarDays, ChevronLeft, ChevronRight, Clock3, FileText, MapPin, Stethoscope, UserRound, X } from 'lucide-react'
 import { getPatientRegistrationOptions } from '../patients/patientApi'
 import { CancelAppointmentForm } from './CancelAppointmentForm'
 import { MarkNoShowForm } from './MarkNoShowForm'
 import { RescheduleAppointmentForm } from './RescheduleAppointmentForm'
 import './scheduling.css'
+import './schedulingIntegration.css'
 import {
   formatAgendaDate,
   formatAppointmentTimeRange,
@@ -293,7 +295,8 @@ export function AppointmentAgendaPage({
             </div>}
     {selectedAppointment && <AppointmentDetailsDialog
       appointment={selectedAppointment}
-      canManageAppointment={viewerRole === 'professional'}
+      canManageSchedule
+      canCompleteAppointment={viewerRole === 'professional'}
       onClose={() => setSelectedAppointment(null)}
       onChanged={() => {
         setSelectedAppointment(null)
@@ -433,15 +436,18 @@ function AgendaAppointment({
 
 function AppointmentDetailsDialog({
   appointment: initialAppointment,
-  canManageAppointment,
+  canManageSchedule,
+  canCompleteAppointment,
   onClose,
   onChanged,
 }: {
   appointment: AppointmentScheduleItem
-  canManageAppointment: boolean
+  canManageSchedule: boolean
+  canCompleteAppointment: boolean
   onClose: () => void
   onChanged: () => void
 }) {
+  const navigate = useNavigate()
   const [appointment, setAppointment] = useState(initialAppointment)
   const [error, setError] = useState('')
   const [rescheduling, setRescheduling] = useState(false)
@@ -449,6 +455,7 @@ function AppointmentDetailsDialog({
   const [markingNoShow, setMarkingNoShow] = useState(false)
   const [completing, setCompleting] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [justCompleted, setJustCompleted] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -473,8 +480,9 @@ function AppointmentDetailsDialog({
     setActionError('')
     setCompleting(true)
     try {
-      await completeAppointment(appointment.id)
-      onChanged()
+      const completed = await completeAppointment(appointment.id)
+      setAppointment((current) => ({ ...current, status: completed.status }))
+      setJustCompleted(true)
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : 'Não foi possível concluir o atendimento.')
     } finally {
@@ -510,7 +518,8 @@ function AppointmentDetailsDialog({
           <div><dt><Clock3 />Duração</dt><dd>{appointment.durationMinutes} minutos</dd></div>
           <div className="appointment-details-notes"><dt><FileText />Observações</dt><dd>{appointment.notes || 'Nenhuma observação registrada.'}</dd></div>
         </dl>
-        {canManageAppointment && appointment.status === 'Scheduled' && (rescheduling
+        {justCompleted && <div className="appointment-completed-next"><CalendarCheck2 /><div><strong>Atendimento concluído</strong><p>Você pode registrar a evolução agora ou encerrar e fazer isso depois.</p></div><div><button type="button" className="button button-outline" onClick={onChanged}>Encerrar</button><button type="button" className="button button-primary" onClick={() => navigate(`/app/minhas-evolucoes?appointmentId=${appointment.id}`)}><FileText />Registrar evolução</button></div></div>}
+        {canManageSchedule && appointment.status === 'Scheduled' && (rescheduling
           ? <RescheduleAppointmentForm
             appointment={appointment}
             onCompleted={onChanged}
@@ -531,7 +540,7 @@ function AppointmentDetailsDialog({
           : <div className="appointment-details-actions">
             <button type="button" className="button button-outline" onClick={() => setRescheduling(true)}>Reagendar</button>
             <button type="button" className="button button-danger" onClick={() => setCancelling(true)}>Cancelar</button>
-            {hasStarted && <>
+            {hasStarted && canCompleteAppointment && <>
               <button type="button" className="button button-outline" onClick={() => setMarkingNoShow(true)}>Registrar falta</button>
               <button type="button" className="button button-primary" onClick={() => void complete()} disabled={completing}><CalendarCheck2 />{completing ? 'Concluindo…' : 'Concluir atendimento'}</button>
             </>}

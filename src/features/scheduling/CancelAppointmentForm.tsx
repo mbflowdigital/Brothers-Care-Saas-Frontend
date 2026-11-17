@@ -23,7 +23,10 @@ export function CancelAppointmentForm({ appointment, onCompleted, onCancel }: {
     setError('')
     setSubmitting(true)
     try {
-      await cancelAppointment(appointment.id, { reason: normalizedReason })
+      await cancelAppointment(appointment.id, {
+        professionalId: appointment.professionalId,
+        reason: normalizedReason,
+      })
       onCompleted()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível cancelar o atendimento.')

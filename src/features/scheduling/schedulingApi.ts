@@ -73,6 +73,11 @@ export type AppointmentScheduleItem = {
   updatedAt: string
 }
 
+export type AvailableAppointmentSlot = {
+  startsAt: string
+  endsAt: string
+}
+
 export type CreateAppointmentInput = {
   patientId: string
   clinicUnitId: string
@@ -185,6 +190,45 @@ export async function listAppointments(input: ListAppointmentsInput): Promise<Ap
     },
   )
   return response.json() as Promise<AppointmentScheduleItem[]>
+}
+
+export async function getAvailableAppointmentSlots(input: {
+  clinicUnitId: string
+  date: string
+  durationMinutes: number
+  patientId?: string
+  appointmentId?: string
+}): Promise<AvailableAppointmentSlot[]> {
+  const parameters = new URLSearchParams({
+    clinicUnitId: input.clinicUnitId,
+    date: input.date,
+    durationMinutes: String(input.durationMinutes),
+  })
+  if (input.patientId) parameters.set('patientId', input.patientId)
+  if (input.appointmentId) parameters.set('appointmentId', input.appointmentId)
+
+  let response: Response
+  try {
+    response = await fetch(`${apiBaseUrl}/appointments/available-slots?${parameters}`, {
+      credentials: 'include',
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (caught) {
+    throw connectionError(caught, 'Não foi possível consultar os horários disponíveis.')
+  }
+
+  if (!response.ok) return throwResponseError(
+    response,
+    'Não foi possível consultar os horários disponíveis.',
+    {
+      403: 'O paciente ou a unidade não está disponível para este profissional.',
+      404: 'O agendamento não foi encontrado nesta empresa.',
+      409: 'Somente atendimentos agendados podem ser reagendados.',
+    },
+  )
+
+  const payload = await response.json() as { slots: AvailableAppointmentSlot[] }
+  return payload.slots
 }
 
 export async function getProfessionalAvailability(

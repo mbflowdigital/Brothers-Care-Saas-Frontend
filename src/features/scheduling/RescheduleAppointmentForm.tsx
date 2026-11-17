@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { CalendarClock, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react'
-import { addMinutesToLocalDateTime, getTodayInTimeZone, localDateTimeToOffsetIso, offsetIsoToLocalDateTime } from './dateTime'
-import { getSchedulingOptions, rescheduleAppointment, type AppointmentScheduleItem, type SchedulingOptions } from './schedulingApi'
+import { addMinutesToLocalDateTime, getTodayInTimeZone, offsetIsoToLocalDateTime } from './dateTime'
+import {
+  getAvailableAppointmentSlots,
+  getSchedulingOptions,
+  rescheduleAppointment,
+  type AppointmentScheduleItem,
+  type AvailableAppointmentSlot,
+  type SchedulingOptions,
+} from './schedulingApi'
 
 const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
-const TIME_SLOTS = Array.from({ length: 28 }, (_, index) => {
-  const totalMinutes = 7 * 60 + index * 30
-  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`
-})
 
 export function RescheduleAppointmentForm({ appointment, onCompleted, onCancel }: {
   appointment: AppointmentScheduleItem
@@ -23,6 +26,10 @@ export function RescheduleAppointmentForm({ appointment, onCompleted, onCancel }
   const [visibleMonth, setVisibleMonth] = useState(`${initialLocalDateTime.slice(0, 7)}-01`)
   const [durationMinutes, setDurationMinutes] = useState(() => Math.round((Date.parse(appointment.endsAt) - Date.parse(appointment.startsAt)) / 60000))
   const [loading, setLoading] = useState(true)
+  const [availableSlots, setAvailableSlots] = useState<AvailableAppointmentSlot[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [slotsError, setSlotsError] = useState('')
+  const [slotsRetry, setSlotsRetry] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -44,27 +51,64 @@ export function RescheduleAppointmentForm({ appointment, onCompleted, onCancel }
   const today = getTodayInTimeZone(timeZoneId)
   const dates = useMemo(() => getMonthDates(visibleMonth), [visibleMonth])
   const durationOptions = [...new Set([30, 45, 60, 90, 120, durationMinutes])].sort((left, right) => left - right)
+  const selectedSlot = availableSlots.find((slot) =>
+    getSlotTime(slot, timeZoneId) === selectedTime)
   const endPreview = selectedDate && selectedTime ? addMinutesToLocalDateTime(`${selectedDate}T${selectedTime}`, durationMinutes).slice(11, 16) : ''
+
+  useEffect(() => {
+    if (!options || !selectedUnit || !selectedDate) {
+      setAvailableSlots([])
+      setSlotsError('')
+      setLoadingSlots(false)
+      return
+    }
+
+    let active = true
+    setAvailableSlots([])
+    setSlotsError('')
+    setLoadingSlots(true)
+    getAvailableAppointmentSlots({
+      appointmentId: appointment.id,
+      clinicUnitId: unitId,
+      date: selectedDate,
+      durationMinutes,
+    })
+      .then((slots) => {
+        if (!active) return
+        setAvailableSlots(slots)
+        setSelectedTime((current) =>
+          slots.some((slot) => getSlotTime(slot, selectedUnit.timeZoneId) === current) ? current : '')
+      })
+      .catch((caught: unknown) => {
+        if (!active) return
+        setAvailableSlots([])
+        setSelectedTime('')
+        setSlotsError(caught instanceof Error ? caught.message : 'Não foi possível consultar os horários disponíveis.')
+      })
+      .finally(() => { if (active) setLoadingSlots(false) })
+
+    return () => { active = false }
+  }, [appointment.id, durationMinutes, options, selectedDate, selectedUnit, slotsRetry, unitId])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
-    if (!selectedUnit || !selectedDate || !selectedTime) {
-      setError('Selecione unidade, dia e horário para continuar.')
+    if (!selectedUnit || !selectedDate || !selectedSlot) {
+      setError('Selecione unidade, dia e um horário disponível para continuar.')
       return
     }
 
     try {
-      const localStartsAt = `${selectedDate}T${selectedTime}`
-      const localEndsAt = addMinutesToLocalDateTime(localStartsAt, durationMinutes)
-      const startsAt = localDateTimeToOffsetIso(localStartsAt, selectedUnit.timeZoneId)
-      const endsAt = localDateTimeToOffsetIso(localEndsAt, selectedUnit.timeZoneId)
-      if (Date.parse(startsAt) < Date.now()) {
+      if (Date.parse(selectedSlot.startsAt) < Date.now()) {
         setError('Escolha um horário futuro para reagendar.')
         return
       }
       setSubmitting(true)
-      await rescheduleAppointment(appointment.id, { clinicUnitId: selectedUnit.id, startsAt, endsAt })
+      await rescheduleAppointment(appointment.id, {
+        clinicUnitId: selectedUnit.id,
+        startsAt: selectedSlot.startsAt,
+        endsAt: selectedSlot.endsAt,
+      })
       onCompleted()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível reagendar o atendimento.')
@@ -73,14 +117,14 @@ export function RescheduleAppointmentForm({ appointment, onCompleted, onCancel }
     }
   }
 
-  return <form className="appointment-reschedule-form" onSubmit={submit} aria-busy={loading || submitting}>
+  return <form className="appointment-reschedule-form" onSubmit={submit} aria-busy={loading || loadingSlots || submitting}>
     <div className="appointment-reschedule-title"><CalendarClock /><div><strong>Reagendar atendimento</strong><small>Escolha um novo dia e horário para esta sessão.</small></div></div>
     {loading
       ? <p className="modal-copy">Carregando opções disponíveis…</p>
       : <>
         <div className="field">
           <label htmlFor="reschedule-unit">Unidade <b>*</b></label>
-          <select id="reschedule-unit" value={unitId} onChange={(event) => setUnitId(event.target.value)} required>
+          <select id="reschedule-unit" value={unitId} onChange={(event) => { setUnitId(event.target.value); setSelectedTime(''); setError('') }} required>
             <option value="" disabled>Selecione uma unidade</option>
             {options?.clinicUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
           </select>
@@ -94,19 +138,28 @@ export function RescheduleAppointmentForm({ appointment, onCompleted, onCancel }
             </div>
             <div className="reschedule-weekdays">{WEEKDAY_LABELS.map((label) => <span key={label}>{label}</span>)}</div>
             <div className="reschedule-days">
-              {dates.map((date) => <button key={date} type="button" className={`${date === selectedDate ? 'selected' : ''} ${date.slice(0, 7) !== visibleMonth.slice(0, 7) ? 'outside' : ''}`} onClick={() => setSelectedDate(date)} disabled={date < today} aria-pressed={date === selectedDate}>{Number(date.slice(-2))}</button>)}
+              {dates.map((date) => <button key={date} type="button" className={`${date === selectedDate ? 'selected' : ''} ${date.slice(0, 7) !== visibleMonth.slice(0, 7) ? 'outside' : ''}`} onClick={() => { setSelectedDate(date); setSelectedTime(''); setError('') }} disabled={date < today} aria-pressed={date === selectedDate}>{Number(date.slice(-2))}</button>)}
             </div>
           </section>
           <section className="reschedule-time" aria-label="Selecione o horário">
             <div className="reschedule-time-heading"><Clock3 /><div><strong>Horário</strong><small>{selectedDate ? formatShortDate(selectedDate) : 'Selecione um dia'}</small></div></div>
-            <div className="reschedule-time-slots">{TIME_SLOTS.map((time) => <button key={time} type="button" className={time === selectedTime ? 'selected' : ''} onClick={() => setSelectedTime(time)}>{time}</button>)}</div>
-            <label className="reschedule-duration"><span>Duração</span><select value={durationMinutes} onChange={(event) => setDurationMinutes(Number(event.target.value))}>{durationOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes} minutos</option>)}</select></label>
+            {loadingSlots
+              ? <p className="modal-copy" role="status">Consultando horários disponíveis…</p>
+              : slotsError
+                ? <p className="form-error" role="alert">{slotsError} <button type="button" className="link-button" onClick={() => setSlotsRetry((value) => value + 1)}>Tentar novamente</button></p>
+                : availableSlots.length === 0
+                  ? <p className="modal-copy" role="status">Não há horários disponíveis nesta data para a duração selecionada.</p>
+                  : <div className="reschedule-time-slots">{availableSlots.map((slot) => {
+                    const time = getSlotTime(slot, timeZoneId)
+                    return <button key={slot.startsAt} type="button" className={time === selectedTime ? 'selected' : ''} onClick={() => setSelectedTime(time)}>{time}</button>
+                  })}</div>}
+            <label className="reschedule-duration"><span>Duração</span><select value={durationMinutes} onChange={(event) => { setDurationMinutes(Number(event.target.value)); setSelectedTime(''); setError('') }}>{durationOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes} minutos</option>)}</select></label>
             {endPreview && <p className="reschedule-summary">Novo horário: <strong>{selectedTime} – {endPreview}</strong></p>}
           </section>
         </div>
       </>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="appointment-reschedule-actions"><button type="button" className="button button-outline" onClick={onCancel} disabled={submitting}>Voltar</button><button type="submit" className="button button-primary" disabled={loading || submitting || !selectedUnit}>{submitting ? 'Reagendando…' : 'Confirmar reagendamento'}</button></div>
+    <div className="appointment-reschedule-actions"><button type="button" className="button button-outline" onClick={onCancel} disabled={submitting}>Voltar</button><button type="submit" className="button button-primary" disabled={loading || loadingSlots || submitting || !selectedUnit || !selectedSlot}>{submitting ? 'Reagendando…' : 'Confirmar reagendamento'}</button></div>
   </form>
 }
 
@@ -133,4 +186,8 @@ function formatMonth(date: string): string {
 
 function formatShortDate(date: string): string {
   return new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))
+}
+
+function getSlotTime(slot: AvailableAppointmentSlot, timeZoneId: string): string {
+  return offsetIsoToLocalDateTime(slot.startsAt, timeZoneId).slice(11, 16)
 }
